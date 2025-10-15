@@ -77,5 +77,4 @@ examples/**/results/
 results/
 
 # Legacy exports
-legacy/
 *.csv

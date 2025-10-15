@@ -1,6 +1,6 @@
 [project]
 name = "the-convergence"
-version = "0.1.1"
+version = "0.1.2"
 description = "API Optimization Framework powered by evolutionary algorithms, multi-armed bandits, and agent societies"
 authors = [
     {name = "Aria Han", email = "aria@persistos.co"},
