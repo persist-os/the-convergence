@@ -1,0 +1,95 @@
+{
+  "test_cases": [
+    {
+      "id": "search_tech_1",
+      "description": "Technical query about AI models",
+      "input": {
+        "query": "latest transformer architecture improvements 2024"
+      },
+      "expected": {
+        "contains_keywords": ["transformer", "architecture", "attention"],
+        "min_results": 5,
+        "max_latency_ms": 3000,
+        "relevance_threshold": 0.8
+      },
+      "metadata": {
+        "category": "technical",
+        "difficulty": "medium",
+        "weight": 1.0
+      }
+    },
+    {
+      "id": "search_news_1",
+      "description": "Recent news query",
+      "input": {
+        "query": "AI regulation policy 2024"
+      },
+      "expected": {
+        "contains_keywords": ["AI", "regulation", "policy"],
+        "recency_days": 90,
+        "min_results": 10,
+        "max_latency_ms": 3000
+      },
+      "metadata": {
+        "category": "news",
+        "difficulty": "easy",
+        "weight": 1.0
+      }
+    },
+    {
+      "id": "search_academic_1",
+      "description": "Academic research query",
+      "input": {
+        "query": "attention mechanisms in neural networks"
+      },
+      "expected": {
+        "contains_keywords": ["attention", "neural network", "mechanism"],
+        "prefers_domains": ["arxiv.org", "scholar.google.com", "ieee.org"],
+        "min_results": 5,
+        "max_latency_ms": 4000,
+        "relevance_threshold": 0.85
+      },
+      "metadata": {
+        "category": "academic",
+        "difficulty": "hard",
+        "weight": 1.5
+      }
+    },
+    {
+      "id": "search_code_1",
+      "description": "Code-related search",
+      "input": {
+        "query": "python async await best practices"
+      },
+      "expected": {
+        "contains_keywords": ["python", "async", "await"],
+        "prefers_domains": ["github.com", "stackoverflow.com"],
+        "min_results": 8,
+        "max_latency_ms": 2500
+      },
+      "metadata": {
+        "category": "code",
+        "difficulty": "medium",
+        "weight": 1.2
+      }
+    },
+    {
+      "id": "search_general_1",
+      "description": "General knowledge query",
+      "input": {
+        "query": "how does photosynthesis work"
+      },
+      "expected": {
+        "contains_keywords": ["photosynthesis", "plants", "chlorophyll"],
+        "min_results": 5,
+        "max_latency_ms": 2000
+      },
+      "metadata": {
+        "category": "general",
+        "difficulty": "easy",
+        "weight": 0.8
+      }
+    }
+  ]
+}
+

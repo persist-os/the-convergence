@@ -1,0 +1,148 @@
+[project]
+name = "the-convergence"
+version = "0.1.0"
+description = "API Optimization Framework powered by evolutionary algorithms, multi-armed bandits, and agent societies"
+authors = [
+    {name = "Aria Han", email = "aria@persistos.co"},
+    {name = "Shreyash Hamal", email = "shrey@persistos.co"},
+    {name = "Myat Pyae Paing", email = "paing@persistos.co"}
+]
+maintainers = [
+    {name = "Aria Han", email = "aria@persistos.co"},
+    {name = "Shreyash Hamal", email = "shrey@persistos.co"},
+    {name = "Myat Pyae Paing", email = "paing@persistos.co"}
+]
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "Apache-2.0"}
+keywords = [
+    "optimization",
+    "api",
+    "evolutionary-algorithms",
+    "multi-armed-bandits",
+    "reinforcement-learning",
+    "agent-society",
+    "llm-optimization",
+    "parameter-tuning",
+    "a-b-testing",
+    "machine-learning"
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Operating System :: OS Independent",
+    "Typing :: Typed",
+]
+
+dependencies = [
+    # Core framework
+    "pydantic>=2.0.0",
+    "pydantic-settings>=2.0.0",
+    "typer>=0.9.0",
+    "pyyaml>=6.0.0",
+    "rich>=13.0.0",
+    "diagrams",
+    
+    # Optimization engine
+    "httpx>=0.25.0",
+    "tenacity>=8.0.0",
+    "numpy>=1.24.0",
+    "scipy>=1.10.0",
+    
+    # Storage
+    "aiosqlite>=0.19.0",
+    "aiofiles>=23.0.0",
+    
+    # Logging
+    "weave>=0.50.0",
+    
+    # LLM Provider (for RLP/SAO)
+    "litellm>=1.0.0",
+    
+    # Environment management
+    "python-dotenv>=1.0.0",
+    
+    # Plugin system
+    "pluggy>=1.3.0",
+]
+
+[project.optional-dependencies]
+# Full agent society features (RLP + SAO)
+agents = [
+    "transformers>=4.40.0",
+    "torch>=2.0.0",
+    "trl>=0.8.0",
+    "peft>=0.10.0",
+    "datasets>=2.18.0",
+    "accelerate>=0.27.0",
+    "litellm>=1.0.0",
+]
+
+# Advanced LLM features
+llm = [
+    "langgraph>=0.0.1",
+    "litellm>=1.0.0",
+]
+
+# All features
+all = [
+    "the-convergence[agents,llm]",
+]
+
+# Development tools
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "hypothesis>=6.0.0",
+    "ruff>=0.1.0",
+    "mypy>=1.0.0",
+    "mkdocs>=1.5.0",
+    "mkdocs-material>=9.0.0",
+]
+
+[project.scripts]
+convergence = "convergence.cli.main:app"
+
+[project.urls]
+Homepage = "https://github.com/persist-os/the-convergence"
+Documentation = "https://github.com/persist-os/the-convergence#readme"
+Repository = "https://github.com/persist-os/the-convergence"
+Issues = "https://github.com/persist-os/the-convergence/issues"
+Changelog = "https://github.com/persist-os/the-convergence/blob/main/CHANGELOG.md"
+
+[build-system]
+requires = ["setuptools>=68.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["convergence*", "examples*"]
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+python_files = ["test_*.py"]

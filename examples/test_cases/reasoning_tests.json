@@ -1,0 +1,30 @@
+{
+  "test_cases": [
+    {
+      "id": "math_basic_1",
+      "description": "Basic arithmetic word problem",
+      "input": {
+        "messages": [
+          {
+            "role": "system",
+            "content": "You are a helpful assistant that excels at reasoning. Show your work step by step."
+          },
+          {
+            "role": "user",
+            "content": "Sarah has 15 apples. She gives 4 to John and 3 to Mary. Then she buys 8 more apples. How many apples does Sarah have now?"
+          }
+        ]
+      },
+      "expected": {
+        "answer": 16,
+        "requires_steps": true,
+        "min_quality_score": 0.95
+      },
+      "metadata": {
+        "category": "math",
+        "difficulty": "easy",
+        "weight": 1.0
+      }
+    }
+  ]
+}

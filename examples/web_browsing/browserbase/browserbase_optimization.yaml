@@ -1,0 +1,123 @@
+# BrowserBase API Optimization Example
+# Find the best browser automation configuration
+#
+# Required Environment Variables:
+#   BROWSERBASE_API_KEY - Your BrowserBase API key
+#   BROWSERBASE_PROJECT_ID - Your BrowserBase project ID
+#
+# Set them before running:
+#   export BROWSERBASE_API_KEY="bb_live_..."
+#   export BROWSERBASE_PROJECT_ID="..."
+#
+# ⚠️  RATE LIMIT WARNING - CRITICAL:
+#   BrowserBase has a 25 concurrent session limit (free/basic plans).
+#   ❌ Sessions CANNOT be deleted via API (DELETE endpoint doesn't exist!)
+#   ⏱️  Sessions only expire after 5 minutes of inactivity.
+#   
+#   This config creates: 1 config × 2 tests × 2 generations = 4 sessions total
+#   RECOMMENDATION: Wait 10 minutes between optimization runs for sessions to expire!
+
+api:
+  name: "browserbase"
+  endpoint: "https://api.browserbase.com/v1/sessions"
+  adapter_enabled: true      # Enable BrowserBase adapter for proper payload transformation
+  mock_mode: false           # Set to true for testing without real API calls
+  auth:
+    type: "api_key"
+    token_env: "BROWSERBASE_API_KEY"
+    header_name: "x-bb-api-key"  # Required header name for BrowserBase (use 'header_name', not 'api_key_header')
+  
+  request:
+    method: "POST"
+    headers:
+      Content-Type: "application/json"
+  
+  response:
+    success_field: "status"
+    result_field: "data"
+
+search_space:
+  parameters:
+    # Browser settings
+    browser_type:
+      type: "categorical"
+      values: ["chromium", "firefox", "webkit"]
+    
+    headless:
+      type: "categorical"
+      values: [true, false]
+    
+    # Viewport settings
+    viewport_width:
+      type: "discrete"
+      values: [1280, 1920, 2560]
+    
+    viewport_height:
+      type: "discrete"
+      values: [720, 1080, 1440]
+    
+    # Performance settings
+    timeout_ms:
+      type: "discrete"
+      values: [5000, 10000, 30000]
+    
+    wait_strategy:
+      type: "categorical"
+      values: ["network_idle", "load", "dom_content_loaded"]
+
+evaluation:
+  test_cases:
+    path: "./browserbase_tests.json"
+    # Path is relative to this YAML file (examples/web_browsing/browserbase/)
+  
+  metrics:
+    success_rate:
+      weight: 0.4
+      type: "higher_is_better"
+      function: "custom"
+    
+    execution_time_ms:
+      weight: 0.4
+      type: "lower_is_better"
+      function: "custom"
+    
+    cost_per_session:
+      weight: 0.2
+      type: "lower_is_better"
+  
+  custom_evaluator:
+    enabled: true
+    module: "browserbase_evaluator"
+    function: "score_browserbase_response"
+
+optimization:
+  algorithm: "mab_evolution"
+  mab:
+    strategy: "thompson_sampling"
+  evolution:
+    population_size: 1  # MINIMAL: Only 1 config per generation (sessions cannot be deleted!)
+    generations: 2
+  execution:
+    experiments_per_generation: 1  # MINIMAL: Only 1 experiment per generation
+    parallel_workers: 1  # Sequential execution to avoid rate limits
+    max_retries: 1  # MINIMAL: Only 1 retry (sessions accumulate!)
+    early_stopping:
+      enabled: true
+      patience: 1  # Wait 1 generation before stopping
+      min_improvement: 0.001
+
+output:
+  save_path: "results/browserbase"
+  formats: ["json", "markdown"]
+
+# Agent Society (RLP + SAO)
+society:
+  enabled: true
+  learning:
+    rlp_enabled: true
+    sao_enabled: true
+  storage:
+    backend: "multi"
+    path: "data/browserbase_optimization"
+
+

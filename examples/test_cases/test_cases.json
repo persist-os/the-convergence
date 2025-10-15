@@ -1,0 +1,148 @@
+{
+  "test_cases": [
+    {
+      "id": "hello_function",
+      "description": "Simple function generation",
+      "input": {
+        "input": "Write a Python function called 'hello' that prints 'Hello, World!'"
+      },
+      "expected": {
+        "language": "python",
+        "contains": ["def", "hello", "print"],
+        "min_lines": 2,
+        "max_complexity": 5
+      },
+      "metadata": {
+        "category": "code_generation",
+        "difficulty": "easy",
+        "weight": 1.0
+      }
+    },
+    {
+      "id": "add_function",
+      "description": "Simple arithmetic function",
+      "input": {
+        "input": "Write a Python function that adds two numbers and returns the result"
+      },
+      "expected": {
+        "language": "python",
+        "contains": ["def", "return"],
+        "min_lines": 2,
+        "max_complexity": 5
+      },
+      "metadata": {
+        "category": "code_generation",
+        "difficulty": "easy",
+        "weight": 1.0
+      }
+    },
+    {
+      "id": "list_sum",
+      "description": "Basic iteration and calculation",
+      "input": {
+        "input": "Write a Python function that takes a list of numbers and returns their sum"
+      },
+      "expected": {
+        "language": "python",
+        "contains": ["def", "for", "return"],
+        "min_lines": 3,
+        "max_complexity": 10
+      },
+      "metadata": {
+        "category": "code_generation",
+        "difficulty": "easy",
+        "weight": 1.0
+      }
+    },
+    {
+      "id": "filter_even",
+      "description": "List filtering with conditional logic",
+      "input": {
+        "input": "Write a Python function that filters even numbers from a list"
+      },
+      "expected": {
+        "language": "python",
+        "contains": ["def", "if", "return"],
+        "min_lines": 3,
+        "max_complexity": 10
+      },
+      "metadata": {
+        "category": "code_generation",
+        "difficulty": "medium",
+        "weight": 1.5
+      }
+    },
+    {
+      "id": "simple_class",
+      "description": "Basic class with constructor",
+      "input": {
+        "input": "Write a Python class called 'Person' with a constructor that takes name and age"
+      },
+      "expected": {
+        "language": "python",
+        "contains": ["class", "Person", "__init__", "self"],
+        "min_lines": 3,
+        "max_complexity": 5
+      },
+      "metadata": {
+        "category": "code_generation",
+        "difficulty": "medium",
+        "weight": 1.5
+      }
+    },
+    {
+      "id": "error_handling",
+      "description": "Function with exception handling",
+      "input": {
+        "input": "Write a Python function that divides two numbers with try-except error handling"
+      },
+      "expected": {
+        "language": "python",
+        "contains": ["def", "try", "except", "return"],
+        "min_lines": 5,
+        "max_complexity": 10
+      },
+      "metadata": {
+        "category": "code_generation",
+        "difficulty": "medium",
+        "weight": 2.0
+      }
+    },
+    {
+      "id": "fibonacci",
+      "description": "Classic algorithm implementation",
+      "input": {
+        "input": "Write a Python function that returns the nth Fibonacci number using iteration"
+      },
+      "expected": {
+        "language": "python",
+        "contains": ["def", "for", "return"],
+        "min_lines": 5,
+        "max_complexity": 15
+      },
+      "metadata": {
+        "category": "code_generation",
+        "difficulty": "hard",
+        "weight": 2.5
+      }
+    },
+    {
+      "id": "data_processor",
+      "description": "Class with multiple methods and error handling",
+      "input": {
+        "input": "Write a Python class called 'DataProcessor' with methods to load, validate, and process data from a list"
+      },
+      "expected": {
+        "language": "python",
+        "contains": ["class", "DataProcessor", "def", "self"],
+        "min_lines": 10,
+        "max_complexity": 20
+      },
+      "metadata": {
+        "category": "code_generation",
+        "difficulty": "hard",
+        "weight": 3.0
+      }
+    }
+  ]
+}

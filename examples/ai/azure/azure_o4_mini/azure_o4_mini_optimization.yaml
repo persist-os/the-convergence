@@ -1,0 +1,91 @@
+# Azure OpenAI o4-mini Optimization
+# Based on Azure AI Foundry format
+
+api:
+  name: "azure_o4_mini"
+  description: "Azure OpenAI o4-mini (reasoning model)"
+  endpoint: "https://heycontext-openai.openai.azure.com/openai/deployments/o4-mini/chat/completions?api-version=2025-01-01-preview"
+  
+  request:
+    method: "POST"
+    headers:
+      Content-Type: "application/json"
+    timeout_seconds: 120
+  
+  auth:
+    type: "api_key"
+    token_env: "AZURE_API_KEY"
+    header_name: "api-key"
+
+search_space:
+  parameters:
+    # Max completion tokens (o4-mini supports up to 40,000)
+    # Based on results, responses are ~300-600 tokens, so testing wider range
+    max_completion_tokens:
+      type: "discrete"
+      values: [500, 1000, 2000, 4000, 8000]
+
+evaluation:
+  test_cases:
+    path: "reasoning_tests.json"
+    # Path is relative to this YAML file (examples/ai/azure/azure_o4_mini/)
+    
+    # ✨ NEW: Automatic test case augmentation using evolutionary algorithms
+    # Generates variations of your test cases to increase coverage
+    augmentation:
+      enabled: true  # Turn on/off test case evolution
+      mutation_rate: 0.3  # 30% chance to mutate each element
+      crossover_rate: 0.2  # 20% chance to crossover vs pure mutation
+      augmentation_factor: 2  # Generate 2 variants per original test
+      preserve_originals: true  # Keep original tests in addition to variants
+      # With 3 original tests + 2 variants each = 9 total test cases
+  
+  metrics:
+    reasoning_accuracy:
+      weight: 0.40
+      type: "higher_is_better"
+      function: "custom"
+    
+    solution_completeness:
+      weight: 0.30
+      type: "higher_is_better"
+      function: "custom"
+    
+    latency_sec:
+      weight: 0.20
+      type: "lower_is_better"
+      function: "custom"
+    
+    cost_per_task:
+      weight: 0.10
+      type: "lower_is_better"
+      function: "custom"
+  
+  custom_evaluator:
+    enabled: true
+    module: "azure_o4_mini_evaluator"
+    function: "score_o4_mini_response"
+
+optimization:
+  algorithm: "mab_evolution"
+  
+  mab:
+    strategy: "thompson_sampling"
+    exploration_rate: 0.2
+  
+  evolution:
+    generations: 4  # Adjusted for augmented test cases
+    population_size: 4  # Balanced for 9 test cases
+    mutation_rate: 0.25
+    crossover_rate: 0.7
+    elite_size: 1
+    early_stopping_generations: 6
+  
+  execution:
+    experiments_per_generation: 36  # 4 configs × 9 test cases (3 original + 6 variants)
+    parallel_workers: 3  # Parallel execution for faster optimization
+    max_retries: 3
+    retry_delay_seconds: 2
+
+society:
+  enabled: false

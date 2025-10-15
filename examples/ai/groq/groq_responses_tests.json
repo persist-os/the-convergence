@@ -1,0 +1,74 @@
+{
+  "test_cases": [
+    {
+      "id": "creative_story",
+      "description": "Creative text generation (Groq excels at fast creative output)",
+      "input": {
+        "messages": [
+          {
+            "role": "user",
+            "content": "Write a one-sentence story about a robot learning to paint."
+          }
+        ]
+      },
+      "expected": {
+        "contains": ["robot", "paint"],
+        "min_length": 20,
+        "format": "text",
+        "min_quality_score": 0.75
+      },
+      "metadata": {
+        "category": "creative",
+        "difficulty": "easy",
+        "weight": 1.0
+      }
+    },
+    {
+      "id": "factual_qa",
+      "description": "Simple factual question",
+      "input": {
+        "messages": [
+          {
+            "role": "user",
+            "content": "What is the capital of Japan?"
+          }
+        ]
+      },
+      "expected": {
+        "contains": ["Tokyo"],
+        "min_length": 5,
+        "format": "text",
+        "min_quality_score": 0.95
+      },
+      "metadata": {
+        "category": "qa",
+        "difficulty": "easy",
+        "weight": 1.0
+      }
+    },
+    {
+      "id": "math_reasoning",
+      "description": "Basic math problem (tests reasoning speed)",
+      "input": {
+        "messages": [
+          {
+            "role": "user",
+            "content": "A car travels at 80 km/h for 3 hours. How far does it travel?"
+          }
+        ]
+      },
+      "expected": {
+        "contains": ["240"],
+        "min_length": 10,
+        "format": "text",
+        "min_quality_score": 0.9
+      },
+      "metadata": {
+        "category": "reasoning",
+        "difficulty": "medium",
+        "weight": 1.5
+      }
+    }
+  ]
+}
+

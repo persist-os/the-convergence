@@ -1,0 +1,157 @@
+{
+  "test_cases": [
+    {
+      "id": "bedtime_story",
+      "description": "Simple creative text generation",
+      "input": {
+        "input": "Write a one-sentence bedtime story about a unicorn."
+      },
+      "expected": {
+        "contains": ["unicorn"],
+        "min_length": 1,
+        "format": "text",
+        "min_quality_score": 0.8
+      },
+      "metadata": {
+        "category": "creative",
+        "difficulty": "easy",
+        "weight": 1.0
+      }
+    },
+    {
+      "id": "capital_question",
+      "description": "Simple factual question",
+      "input": {
+        "input": "What is the capital of Senegal?"
+      },
+      "expected": {
+        "contains": ["Dakar"],
+        "min_length": 5,
+        "format": "text",
+        "min_quality_score": 0.95
+      },
+      "metadata": {
+        "category": "qa",
+        "difficulty": "easy",
+        "weight": 1.0
+      }
+    },
+    {
+      "id": "math_problem",
+      "description": "Basic math reasoning",
+      "input": {
+        "input": "If a train travels 60 mph for 2 hours, how far does it go?"
+      },
+      "expected": {
+        "contains": ["120"],
+        "min_length": 10,
+        "format": "text",
+        "min_quality_score": 0.9
+      },
+      "metadata": {
+        "category": "reasoning",
+        "difficulty": "medium",
+        "weight": 1.5
+      }
+    },
+    {
+      "id": "translation",
+      "description": "Simple translation task",
+      "input": {
+        "input": "Translate to Spanish: Hello, how are you?"
+      },
+      "expected": {
+        "contains": ["Hola"],
+        "format": "text",
+        "min_quality_score": 0.9
+      },
+      "metadata": {
+        "category": "translation",
+        "difficulty": "easy",
+        "weight": 1.0
+      }
+    },
+    {
+      "id": "logic_riddle",
+      "description": "Logic puzzle requiring step-by-step reasoning",
+      "input": {
+        "input": "Sarah has 3 cats and 2 dogs. Each cat hates 1 dog and each dog fears 2 cats. If animals that hate/fear each other can't be in the same room, what's the maximum number of animals that can be in one room together?"
+      },
+      "expected": {
+        "contains": ["3"],
+        "min_length": 20,
+        "format": "text",
+        "min_quality_score": 0.85,
+        "max_latency_ms": 3000
+      },
+      "metadata": {
+        "category": "logic",
+        "difficulty": "medium",
+        "weight": 1.5
+      }
+    },
+    {
+      "id": "constrained_creativity",
+      "description": "Creative writing with multiple constraints",
+      "input": {
+        "input": "Write a haiku about artificial intelligence that includes the word 'dream' and references the color blue. Make it philosophical."
+      },
+      "expected": {
+        "contains": ["dream", "blue"],
+        "min_length": 15,
+        "max_length": 200,
+        "format": "text",
+        "min_quality_score": 0.80,
+        "max_latency_ms": 3500,
+        "target_tokens": 150
+      },
+      "metadata": {
+        "category": "creative",
+        "difficulty": "medium-hard",
+        "weight": 2.0
+      }
+    },
+    {
+      "id": "multi_step_reasoning",
+      "description": "Complex multi-step reasoning with ambiguity",
+      "input": {
+        "input": "A restaurant has a special: Buy 3 items, get 25% off the total. Items cost: Pizza $12, Salad $8, Drink $3, Dessert $6. If Alice has $25 and wants to maximize her food value while staying under budget, what should she order? Explain your reasoning step by step."
+      },
+      "expected": {
+        "contains": ["Pizza", "total", "$"],
+        "min_length": 50,
+        "format": "text",
+        "min_quality_score": 0.75,
+        "max_latency_ms": 4000,
+        "max_cost_usd": 0.02
+      },
+      "metadata": {
+        "category": "reasoning",
+        "difficulty": "hard",
+        "weight": 2.5
+      }
+    },
+    {
+      "id": "creative_synthesis",
+      "description": "Creative synthesis requiring deep understanding and originality",
+      "input": {
+        "input": "Explain quantum entanglement to a medieval knight using only concepts they would understand (horses, swords, castles, honor). Be accurate to the physics while being historically authentic to their worldview. One paragraph."
+      },
+      "expected": {
+        "contains": ["knight", "sword"],
+        "min_length": 80,
+        "max_length": 500,
+        "format": "text",
+        "min_quality_score": 0.70,
+        "max_latency_ms": 5000,
+        "max_cost_usd": 0.03,
+        "target_tokens": 250
+      },
+      "metadata": {
+        "category": "creative_reasoning",
+        "difficulty": "very_hard",
+        "weight": 3.0
+      }
+    }
+  ]
+}

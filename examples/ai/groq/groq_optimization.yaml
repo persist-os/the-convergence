@@ -1,0 +1,147 @@
+# Groq API Optimization Example
+# Ultra-fast LLM inference with LPU technology
+# Free tier: Generous free tier available
+# Get API key: https://groq.com
+
+api:
+  name: "groq"
+  endpoint: "https://api.groq.com/openai/v1/chat/completions"
+  auth:
+    type: "bearer"
+    token_env: "GROQ_API_KEY"
+  
+  request:
+    method: "POST"
+    headers:
+      Content-Type: "application/json"
+    timeout_seconds: 30
+  
+  response:
+    success_field: "choices"
+    result_field: "choices[0].message.content"
+
+search_space:
+  parameters:
+    # Model selection (ACTIVE Groq models only - Oct 2025)
+    model:
+      type: "categorical"
+      values:
+        - "llama-3.3-70b-versatile"    # Fast, high-quality
+        - "llama-3.1-8b-instant"       # Ultra-fast, cost-efficient
+        # Note: Only using 2 models to reduce API calls and stay within rate limits
+    
+    # Temperature
+    temperature:
+      type: "continuous"
+      min: 0.0
+      max: 2.0
+      step: 0.1
+    
+    # Max tokens
+    max_tokens:
+      type: "discrete"
+      values: [256, 512, 1024, 2048, 4096, 8192]
+    
+    # Top P
+    top_p:
+      type: "continuous"
+      min: 0.1
+      max: 1.0
+      step: 0.1
+    
+    # Stream response
+    stream:
+      type: "categorical"
+      values: [false]
+      # true for streaming, false for complete response
+    
+    # Stop sequences
+    stop:
+      type: "categorical"
+      values: [null, ["</s>"], ["\n\n"]]
+
+evaluation:
+  # Test cases for Groq evaluation
+  test_cases:
+    path: "groq_responses_tests.json"
+    # Path is relative to this YAML file (examples/ai/groq/)
+    # Tests creative, factual, and reasoning tasks (minimal for rate limit compliance)
+  
+  # Built-in Groq evaluator
+  custom_evaluator:
+    enabled: true
+    module: "groq_responses"
+    function: "score_groq_response"
+    # For speed-optimized scoring, use: "score_groq_speed_optimized"
+  
+  # Metrics to optimize
+  metrics:
+    # Response quality (most important)
+    response_quality:
+      weight: 0.35
+      type: "higher_is_better"
+      function: "custom"
+      # Uses the custom evaluator above
+    
+    # Latency (Groq's strength - ultra-fast!)
+    latency_ms:
+      weight: 0.30
+      type: "lower_is_better"
+      threshold: 2000
+      # Groq typically responds in <500ms
+    
+    # Cost per call
+    cost_per_call:
+      weight: 0.20
+      type: "lower_is_better"
+      budget_per_call: 0.05
+      # Groq is very cost-efficient
+    
+    # Token efficiency (quality per token)
+    token_efficiency:
+      weight: 0.15
+      type: "higher_is_better"
+      function: "custom"
+
+optimization:
+  algorithm: "mab_evolution"
+  
+  mab:
+    strategy: "thompson_sampling"
+  
+  evolution:
+    population_size: 3      # Even smaller to avoid rate limits
+    generations: 2          # Just 2 generations for minimal testing
+  
+  execution:
+    experiments_per_generation: 10  # Reduced from 45
+    parallel_workers: 1             # Sequential to respect 30 RPM rate limit
+    max_retries: 5                  # Retry with exponential backoff for rate limits
+    early_stopping:
+      enabled: false                # Disabled for testing
+    # Note: Sequential execution with delays to avoid rate limits
+    # 4 configs × 6 test cases = 24 API calls per generation (under 30 RPM)
+
+output:
+  save_path: "./results/groq_optimization"
+  save_all_experiments: true                        # Save detailed per-experiment data
+  formats: ["json", "markdown", "csv"]             # Multiple formats
+  
+  visualizations:
+    - "score_over_time"
+    - "parameter_importance"
+  
+  export_best_config:
+    enabled: true
+    format: "yaml"                                  # Export as YAML for easy reuse
+    output_path: "examples/results/groq_optimization/best_config.yaml"
+
+# Legacy warm-start: Reuse previous winners across runs
+legacy:
+  enabled: true
+  session_id: "groq_optimization"  # Session name (fingerprint auto-appended)
+  tracking_backend: "builtin"
+  sqlite_path: "./data/legacy.db"
+  export_dir: "./legacy"
+  export_formats: ["winners_only", "full_audit"]
+

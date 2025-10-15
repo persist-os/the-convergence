@@ -1,0 +1,61 @@
+{
+  "test_cases": [
+    {
+      "id": "vector_similarity_1",
+      "description": "Find similar documents",
+      "input": {
+        "query_vector": "embedding_placeholder_1536_dimensions",
+        "top_k": 10
+      },
+      "expected": {
+        "ground_truth_ids": ["doc_123", "doc_456", "doc_789"],
+        "min_recall_at_10": 0.8,
+        "max_latency_ms": 100
+      },
+      "metadata": {
+        "category": "similarity",
+        "difficulty": "easy",
+        "weight": 1.0
+      }
+    },
+    {
+      "id": "vector_filtered_search_1",
+      "description": "Filtered semantic search",
+      "input": {
+        "query_vector": "embedding_placeholder_1536_dimensions",
+        "top_k": 20,
+        "filter": {"category": "technology"}
+      },
+      "expected": {
+        "min_results": 15,
+        "all_match_filter": true,
+        "min_recall_at_20": 0.75,
+        "max_latency_ms": 150
+      },
+      "metadata": {
+        "category": "filtered_search",
+        "difficulty": "medium",
+        "weight": 1.2
+      }
+    },
+    {
+      "id": "vector_high_precision_1",
+      "description": "High precision search",
+      "input": {
+        "query_vector": "embedding_placeholder_1536_dimensions",
+        "top_k": 5,
+        "score_threshold": 0.9
+      },
+      "expected": {
+        "min_precision_at_5": 0.95,
+        "max_latency_ms": 50
+      },
+      "metadata": {
+        "category": "precision",
+        "difficulty": "hard",
+        "weight": 1.5
+      }
+    }
+  ]
+}
+

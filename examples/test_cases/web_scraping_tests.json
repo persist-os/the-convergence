@@ -1,0 +1,60 @@
+{
+  "test_cases": [
+    {
+      "id": "scrape_article_1",
+      "description": "Extract blog article content",
+      "input": {
+        "url": "https://example.com/blog/article"
+      },
+      "expected": {
+        "contains": ["expected content snippet"],
+        "extracted_title": "Article Title",
+        "min_content_length": 500,
+        "max_scrape_time_sec": 15,
+        "success": true
+      },
+      "metadata": {
+        "category": "content_extraction",
+        "difficulty": "easy",
+        "weight": 1.0
+      }
+    },
+    {
+      "id": "scrape_dynamic_content_1",
+      "description": "Extract JavaScript-rendered content",
+      "input": {
+        "url": "https://example.com/spa-app"
+      },
+      "expected": {
+        "js_rendered": true,
+        "contains": ["dynamic content"],
+        "min_content_length": 300,
+        "max_scrape_time_sec": 30
+      },
+      "metadata": {
+        "category": "dynamic_content",
+        "difficulty": "hard",
+        "weight": 1.5
+      }
+    },
+    {
+      "id": "scrape_structured_data_1",
+      "description": "Extract product information",
+      "input": {
+        "url": "https://example.com/product/123"
+      },
+      "expected": {
+        "extracted_fields": ["title", "price", "description", "images"],
+        "price_format": "numeric",
+        "min_images": 1,
+        "max_scrape_time_sec": 20
+      },
+      "metadata": {
+        "category": "structured_data",
+        "difficulty": "medium",
+        "weight": 1.3
+      }
+    }
+  ]
+}
+

@@ -1,0 +1,17 @@
+include README.md
+include LICENSE
+include CHANGELOG.md
+include GETTING_STARTED.md
+include CONTRIBUTING.md
+include SECURITY.md
+include TROUBLESHOOTING.md
+
+recursive-include examples *.py *.yaml *.json *.md *.csv
+recursive-include examples/ai *
+recursive-include examples/web_browsing *
+recursive-include examples/test_cases *
+
+global-exclude __pycache__
+global-exclude *.py[co]
+global-exclude .DS_Store
+

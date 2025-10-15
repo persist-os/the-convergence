@@ -1,0 +1,67 @@
+{
+  "test_cases": [
+    {
+      "id": "hacker_news_scrape",
+      "description": "Simple page load and title extraction from Hacker News",
+      "url": "https://news.ycombinator.com",
+      "selector": ".titleline > a",
+      "expected": {
+        "min_elements": 1,
+        "element_type": "text",
+        "validation": "not_empty"
+      },
+      "success_criteria": {
+        "load_time_ms": 5000,
+        "min_content_length": 10,
+        "requires_javascript": true,
+        "responsive_design": true
+      },
+      "viewport_requirements": {
+        "min_width": 1280,
+        "min_height": 720
+      }
+    },
+    {
+      "id": "httpbin_headers",
+      "description": "API endpoint test - headers check",
+      "url": "https://httpbin.org/headers",
+      "selector": "pre",
+      "expected": {
+        "min_elements": 1,
+        "contains_text": "User-Agent",
+        "validation": "json_like"
+      },
+      "success_criteria": {
+        "load_time_ms": 4000,
+        "min_content_length": 50,
+        "requires_javascript": false,
+        "responsive_design": false
+      },
+      "viewport_requirements": {
+        "min_width": 1280,
+        "min_height": 720
+      }
+    }
+  ],
+  "metadata": {
+    "version": "2.1",
+    "total_tests": 2,
+    "difficulty_distribution": {
+      "easy": 2
+    },
+    "notes": "Reduced test suite to avoid hitting BrowserBase 25 concurrent session limit. Each config × test case creates a session. With 2 configs × 2 tests × 2 generations = 8 total sessions (well under 25 limit).",
+    "parameter_coverage": {
+      "browser_types": ["chromium", "firefox", "webkit"],
+      "headless_modes": [true, false],
+      "viewport_sizes": [[1280, 720], [1920, 1080], [2560, 1440]],
+      "timeout_values": [5000, 10000, 30000],
+      "wait_strategies": ["network_idle", "load", "dom_content_loaded"]
+    },
+    "rate_limit_info": {
+      "concurrent_sessions_limit": 25,
+      "sessions_per_run": "2 configs × 2 tests × 2 generations = 8 sessions",
+      "safety_margin": "17 sessions remaining for other operations"
+    }
+  }
+}
+
