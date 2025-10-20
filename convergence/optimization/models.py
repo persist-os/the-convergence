@@ -272,6 +272,30 @@ class LegacyTrackingConfig(BaseModel):
     weave_config: Dict[str, Any] = Field(default_factory=dict)
 
 
+class ModelConfig(BaseModel):
+    """Configuration for a single model in the agent models registry."""
+    azure_deployment: str
+    azure_endpoint: str
+    api_key_env: str = "AZURE_API_KEY"
+    api_version: str = "2024-12-01-preview"
+    description: Optional[str] = None
+
+
+class RedditAuthConfig(BaseModel):
+    """Reddit API authentication configuration."""
+    client_id_env: str = "REDDIT_CLIENT_ID"
+    client_secret_env: str = "REDDIT_CLIENT_SECRET"
+    user_agent: str = "the-convergence-reddit-tester/1.0"
+    username_env: Optional[str] = None
+    password_env: Optional[str] = None
+
+
+class AgentConfig(BaseModel):
+    """Agent configuration for Agno-based optimizations."""
+    reddit_auth: Optional[RedditAuthConfig] = None
+    models: Dict[str, ModelConfig] = Field(default_factory=dict)
+
+
 class OptimizationSchema(BaseModel):
     """
     Complete optimization schema - this is the root model for optimization.yaml.
@@ -283,6 +307,7 @@ class OptimizationSchema(BaseModel):
     evaluation: EvaluationConfig
     optimization: OptimizationAlgorithmConfig = Field(default_factory=OptimizationAlgorithmConfig)
     output: OutputConfig = Field(default_factory=OutputConfig)
+    agent: Optional[AgentConfig] = None
     society: Optional[SocietyConfig] = None
     legacy: LegacyTrackingConfig = Field(default_factory=LegacyTrackingConfig)  # Enabled by default
 

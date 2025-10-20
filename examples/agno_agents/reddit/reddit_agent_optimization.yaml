@@ -1,0 +1,229 @@
+# Agno Reddit Agent Optimization with Azure OpenAI
+# Tests Reddit toolkit workflows across different agent configurations
+# Focus: Real-world workflows using actual RedditTools functions
+#
+# Required Environment Variables:
+#   REDDIT_CLIENT_ID - Reddit API client ID
+#   REDDIT_CLIENT_SECRET - Reddit API client secret
+#   REDDIT_USERNAME - Your Reddit username (required for API access)
+#   REDDIT_PASSWORD - Your Reddit password (required for API access)
+#   AZURE_API_KEY - Azure OpenAI API key (or per-model keys)
+#
+# Setup:
+#   1. Get Reddit API credentials: https://www.reddit.com/prefs/apps
+#   2. export REDDIT_CLIENT_ID="your_client_id"
+#   3. export REDDIT_CLIENT_SECRET="your_client_secret"
+#   4. export REDDIT_USERNAME="your_reddit_username"
+#   5. export REDDIT_PASSWORD="your_reddit_password"
+#   6. Deploy models to Azure AI Foundry
+#   7. export AZURE_API_KEY="your_azure_key"
+#   8. Configure models in agent.models registry below
+#   9. Select active model(s) in search_space.parameters.model.values
+#   10. convergence optimize reddit_agent_optimization.yaml
+
+api:
+  name: "agno_reddit_agent"
+  description: "Agno agent with Reddit toolkit via Azure OpenAI"
+  # Endpoint is now managed by agent.models registry below
+  # This field is kept for compatibility but not used by the adapter
+  endpoint: "https://placeholder-see-agent-models-registry"
+  
+  adapter_enabled: true  # Enable AgnoRedditAdapter for agent execution
+  
+  request:
+    method: "POST"
+    headers:
+      Content-Type: "application/json"
+    timeout_seconds: 120  # Reddit API + LLM processing can take time
+  
+  auth:
+    type: "api_key"
+    token_env: "AZURE_API_KEY"
+    header_name: "api-key"  # Azure uses 'api-key' header
+
+# Agent configuration
+agent:
+  # Reddit API authentication
+  reddit_auth:
+    client_id_env: "REDDIT_CLIENT_ID"
+    client_secret_env: "REDDIT_CLIENT_SECRET"
+    user_agent: "the-convergence-reddit-tester/1.0"
+    # Required for Reddit API operations that need user authentication
+    username_env: "REDDIT_USERNAME"
+    password_env: "REDDIT_PASSWORD"
+  
+  # Model Registry: Define all available models here
+  # This makes it easy to switch models and manage multiple deployments
+  models:
+    gpt-4-1:
+      azure_deployment: "gpt-4.1"
+      azure_endpoint: "https://heycontext-openai.cognitiveservices.azure.com"
+      api_key_env: "AZURE_API_KEY"  # Can use same key or different: "AZURE_API_KEY_GPT4"
+      api_version: "2024-12-01-preview"  # Required for o4-mini; also works for gpt-4.1
+      description: "GPT-4.1 for high-quality responses"
+    
+    o4-mini:
+      azure_deployment: "o4-mini"
+      azure_endpoint: "https://heycontext-openai.openai.azure.com"
+      api_key_env: "AZURE_API_KEY"
+      api_version: "2024-12-01-preview"  # o4-mini requires 2024-12-01-preview or later
+      description: "o4-mini model for fast, cost-effective testing"
+    
+    # Add more models as you deploy them:
+    # gpt-4o-mini:
+    #   azure_deployment: "gpt-4o-mini-deployment"
+    #   azure_endpoint: "https://your-resource.openai.azure.com"
+    #   api_key_env: "AZURE_API_KEY"
+    #   api_version: "2025-01-01-preview"
+    #   description: "GPT-4o Mini"
+
+# Search space: Agent parameters to optimize
+# MAB-ready architecture: Add/remove models from the list to test different deployments
+search_space:
+  parameters:
+    # Model selection - references model registry keys above
+    # To switch models: just change the values list
+    # To test multiple models: add them to the values list
+    model:
+      type: "categorical"
+      values:
+        - "gpt-4-1"  # Primary model to use
+        # Uncomment to test multiple models:
+        # - "o4-mini"
+        # - "gpt-4o-mini"
+      description: "Model key from agent.models registry"
+    
+    # Temperature - affects reasoning consistency
+    # gpt-4-1 supports full temperature range
+    temperature:
+      type: "categorical"
+      values: [0.0, 0.2, 0.4, 0.6, 0.8, 1.0]  # Full range for gpt-4-1
+      description: "Temperature range for gpt-4-1: 0.0=deterministic, 1.0=creative"
+    
+    # Max completion tokens - affects response completeness
+    max_completion_tokens:
+      type: "discrete"
+      values: [500, 1000, 2000, 4000]
+      description: "Max tokens for agent response"
+    
+    # Instruction strategy - different prompting approaches
+    instruction_style:
+      type: "categorical"
+      values:
+        - "minimal"       # Brief: "You are a Reddit researcher"
+        - "detailed"      # Explicit: Step-by-step guidance
+        - "structured"    # Formatted: Require specific output format
+      description: "Agent instruction/prompting style"
+    
+    # Tool selection strategy
+    tool_strategy:
+      type: "categorical"
+      values:
+        - "include_specific"   # Only tools needed for test
+        - "include_all"        # All RedditTools functions
+      description: "Which Reddit tools to include"
+
+# Evaluation configuration
+evaluation:
+  test_cases:
+    path: "./reddit_test_cases.json"
+    # Path is relative to this YAML file location
+  
+  metrics:
+    # Metric 1: Accuracy (40%) - Did agent use tools correctly?
+    accuracy:
+      weight: 0.40
+      type: "higher_is_better"
+      function: "custom"
+      description: "Tool usage correctness and result relevance"
+    
+    # Metric 2: Completeness (30%) - Are all expected data fields present?
+    completeness:
+      weight: 0.30
+      type: "higher_is_better"
+      function: "custom"
+      description: "Data field presence and population"
+    
+    # Metric 3: Latency (20%) - How fast did agent respond?
+    latency_seconds:
+      weight: 0.20
+      type: "lower_is_better"
+      description: "Response time in seconds"
+    
+    # Metric 4: Token Efficiency (10%) - Value per token used
+    token_efficiency:
+      weight: 0.10
+      type: "higher_is_better"
+      function: "custom"
+      description: "Cost-effectiveness of response"
+  
+  custom_evaluator:
+    enabled: true
+    module: "reddit_evaluator"
+    function: "score_reddit_agent_response"
+
+# Optimization settings - MAB algorithm for model comparison
+optimization:
+  algorithm: "mab_evolution"  # Multi-Armed Bandits + Evolution
+  
+  # Multi-Armed Bandits: Efficiently explore different models/configs
+  mab:
+    strategy: "thompson_sampling"  # Bayesian approach for exploration/exploitation
+    exploration_rate: 0.2  # Balance between trying new configs and exploiting known good ones
+  
+  # Evolution: Refine successful configurations
+  evolution:
+    population_size: 3      # Test 3 configs per generation
+    generations: 3          # 3 generations for evolution
+    mutation_rate: 0.20     # 20% chance to mutate parameters
+    crossover_rate: 0.40    # 40% chance to combine successful configs
+    elite_size: 1           # Keep best config across generations
+  
+  # Execution settings
+  execution:
+    experiments_per_generation: 12  # 3 configs × 4 test cases
+    parallel_workers: 1     # Sequential to respect Reddit rate limits
+    max_retries: 3
+    retry_delay_seconds: 2  # Wait between Reddit API calls
+    early_stopping:
+      enabled: true
+      patience: 2
+      min_improvement: 0.01
+
+# Output configuration
+output:
+  save_path: "./results/reddit_agent_optimization"
+  save_all_experiments: true
+  formats: ["json", "markdown", "csv"]
+  
+  visualizations:
+    - "score_over_time"
+    - "parameter_importance"
+    - "cost_vs_quality"
+  
+  export_best_config:
+    enabled: true
+    format: "python"
+    output_path: "./results/best_reddit_agent_config.py"
+
+# Rate limiting for Reddit API
+rate_limiting:
+  enabled: true
+  requests_per_minute: 50  # Conservative (Reddit allows 60/min)
+  burst_limit: 10
+  backoff_strategy: "exponential"
+
+# Legacy tracking (continuous improvement across runs)
+legacy:
+  enabled: true
+  session_id: "reddit_agent_optimization"
+  tracking_backend: "builtin"
+  sqlite_path: "./data/reddit_legacy.db"
+  export_dir: "./legacy_exports/reddit"
+  export_formats: ["csv", "json"]
+
+# Agent Society (optional - advanced AI features)
+society:
+  enabled: false  # Disable for initial testing
+  # Enable later for RLP/SAO features that can improve agent performance
+

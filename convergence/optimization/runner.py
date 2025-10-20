@@ -37,6 +37,7 @@ try:
     from .adapters.azure import AzureOpenAIAdapter
     from .adapters.gemini import GeminiAdapter
     from .adapters.browserbase import BrowserBaseAdapter
+    from .adapters.agno_reddit import AgnoRedditAdapter
     ADAPTERS_AVAILABLE = True
 except ImportError:
     ADAPTERS_AVAILABLE = False
@@ -44,6 +45,7 @@ except ImportError:
     AzureOpenAIAdapter = None
     GeminiAdapter = None
     BrowserBaseAdapter = None
+    AgnoRedditAdapter = None
 
 # Weave integration for observability
 try:
@@ -84,7 +86,7 @@ class OptimizationRunner:
         # Initialize API adapter based on provider
         # OpenAI is the default/base behavior (no adapter needed)
         # Other providers get their specific adapters
-        self.adapter = self._detect_adapter(config.api.name)
+        self.adapter = self._detect_adapter(config.api.name, config_file_path)
         if self.adapter:
             adapter_name = self.adapter.__class__.__name__
             console.print(f"   ✨ Using {adapter_name} for request/response transformation")
@@ -143,19 +145,9 @@ class OptimizationRunner:
                 )
                 logger.info("[AGENT SOCIETY] SAO (Self-Alignment Optimization) enabled")
         
-        # API Adapter (for complex APIs like BrowserBase)
-        self.api_adapter = None
-        if config.api.adapter_enabled:
-            adapter_name = config.api.name.lower()
-            if adapter_name == "browserbase":
-                try:
-                    self.api_adapter = BrowserBaseAdapter()
-                    print(f"✅ Loaded {adapter_name} adapter")
-                except ValueError as e:
-                    print(f"⚠️ Adapter initialization failed: {e}")
-                    print(f"⚠️ Falling back to mock mode")
-                    # Force mock mode if adapter fails
-                    self.config.api.mock_mode = True
+        # Legacy API Adapter code - now handled by _detect_adapter() above
+        # Keeping this for reference but it's no longer used
+        self.api_adapter = self.adapter  # Point to the same adapter for backwards compatibility
         
         # Storage
         self._init_storage()
@@ -198,13 +190,22 @@ class OptimizationRunner:
             file_base_dir=f"{path}/files"
         )
     
-    def _detect_adapter(self, api_name: str):
+    def _detect_adapter(self, api_name: str, config_file_path: Optional[Path] = None):
         """Detect and return appropriate API adapter based on API name."""
         if not ADAPTERS_AVAILABLE:
             return None
         
         api_name_lower = api_name.lower()
         
+        # Check for Agno agent adapters first (they need special handling)
+        if "agno" in api_name_lower and "reddit" in api_name_lower:
+            if AgnoRedditAdapter:
+                return AgnoRedditAdapter(self.config.dict(), config_file_path)
+            else:
+                console.print("[yellow]⚠️  AgnoRedditAdapter not available[/yellow]")
+                return None
+        
+        # Standard API adapters
         if "openai" in api_name_lower:
             return OpenAIAdapter()
         elif "azure" in api_name_lower:
@@ -841,6 +842,35 @@ class OptimizationRunner:
         """Make API call with retry logic."""
         max_retries = self.config.optimization.execution.max_retries
         
+        # Special handling for Agno adapters - they execute agents instead of HTTP calls
+        if self.adapter and AgnoRedditAdapter and isinstance(self.adapter, AgnoRedditAdapter):
+            try:
+                # Agno adapter executes the agent and returns result directly
+                result = self.adapter.transform_request(config, test_case)
+                
+                # Transform response format
+                result = self.adapter.transform_response(result)
+                
+                # Convert to APIResponse format
+                latency_ms = result.get('latency_seconds', 0.0) * 1000
+                
+                return APIResponse(
+                    success=True,
+                    result=result,
+                    latency_ms=latency_ms,
+                    error=result.get('error', None)
+                )
+            except Exception as e:
+                error_msg = f"Agno agent execution failed: {str(e)}"
+                console.print(f"   [red]❌ {error_msg}[/red]")
+                return APIResponse(
+                    success=False,
+                    result=None,
+                    latency_ms=0.0,
+                    error=error_msg
+                )
+        
+        # Standard HTTP API call flow
         # Prepare request payload (merge test case input with config parameters)
         payload = {**test_case.get("input", {}), **config}
         
