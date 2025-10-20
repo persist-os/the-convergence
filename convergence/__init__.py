@@ -6,7 +6,8 @@ an agent society using RLP (reasoning), SAO (self-improvement), MAB (exploration
 and hierarchical learning.
 
 Usage:
-    convergence optimize config.yaml
+    CLI: convergence optimize config.yaml
+    SDK: from convergence import run_optimization
 """
 
 __version__ = "0.1.0"
@@ -25,6 +26,9 @@ from convergence.core.registry import PluginRegistry
 from convergence.optimization.config_loader import ConfigLoader
 from convergence.optimization.runner import OptimizationRunner
 
+# SDK interface (for programmatic use)
+from convergence.sdk import run_optimization, load_config_from_file
+
 __all__ = [
     # Core protocols
     "LLMProvider",
@@ -37,4 +41,7 @@ __all__ = [
     # Optimization
     "ConfigLoader",
     "OptimizationRunner",
+    # SDK
+    "run_optimization",
+    "load_config_from_file",
 ]
