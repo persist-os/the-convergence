@@ -8,7 +8,7 @@ Provides:
 from pathlib import Path
 from typing import Dict, Any
 from rich.console import Console
-from rich.prompt import Prompt
+from rich.prompt import Prompt, Confirm
 
 
 async def run_interactive_setup(project_dir: Path, output_dir: Path) -> Dict[str, Any]:
@@ -32,7 +32,33 @@ async def run_interactive_setup(project_dir: Path, output_dir: Path) -> Dict[str
     console.print("─" * 60)
     console.print("")
     
-    # Step 1: Choose template
+    # Step 1: Choose setup approach
+    console.print("[bold cyan]Choose your starting point:[/bold cyan]")
+    console.print("")
+    console.print("1. Guided Setup - Answer a few questions, we'll fill the rest")
+    console.print("2. Use Preset Template - Start from working examples")
+    console.print("3. Custom Template - Build from proven patterns")
+    console.print("")
+    
+    choice = Prompt.ask(
+        "Select approach",
+        choices=["1", "2", "3"],
+        default="1"
+    )
+    
+    if choice == "1":
+        return await run_guided_setup(project_dir, output_dir)
+    elif choice == "2":
+        return await run_preset_template_setup(project_dir, output_dir)
+    elif choice == "3":
+        return await run_custom_template_setup(project_dir, output_dir)
+
+
+async def run_preset_template_setup(project_dir: Path, output_dir: Path) -> Dict[str, Any]:
+    """Run preset template setup (existing functionality)."""
+    import os
+    console = Console()
+    
     console.print("[bold cyan]STEP 1: Choose Your API Template[/bold cyan]")
     console.print("")
     console.print("[dim]Select the API you want to optimize. Each template includes:[/dim]")
@@ -51,39 +77,13 @@ async def run_interactive_setup(project_dir: Path, output_dir: Path) -> Dict[str
             console.print(f"      [dim]Features: {', '.join(template['features'])}[/dim]")
         console.print("")
     
-    # Add custom option as last
-    custom_option = len(templates) + 1
-    console.print(f"  [cyan]{custom_option}.[/cyan] Custom (Generic Template)")
-    console.print(f"      Start from scratch with a minimal config")
-    console.print("")
-    
     choice = Prompt.ask(
         "Select template",
-        choices=[str(i) for i in range(1, custom_option + 1)],
+        choices=[str(i) for i in range(1, len(templates) + 1)],
         default="1"
     )
     
     choice_int = int(choice)
-    
-    # Handle custom template
-    if choice_int == custom_option:
-        console.print("")
-        console.print("📝 [bold]Custom Template[/bold]")
-        console.print("")
-        console.print("⚠️  Custom setup not yet implemented")
-        console.print("For now, please:")
-        console.print("  1. Check examples/ directory for reference configs")
-        console.print("  2. Copy and modify a similar example")
-        console.print("")
-        return {
-            'spec_path': 'custom',
-            'config_path': None,
-            'tests_path': None,
-            'test_cases': [],
-            'config': {},
-            'elapsed': 0.0
-        }
-    
     selected_template = templates[choice_int - 1]
     
     console.print("")
@@ -226,6 +226,93 @@ async def run_interactive_setup(project_dir: Path, output_dir: Path) -> Dict[str
         society_config,
         config_overrides
     )
+
+
+async def run_guided_setup(project_dir: Path, output_dir: Path) -> Dict[str, Any]:
+    """Run guided setup with step-by-step questions."""
+    console = Console()
+    
+    console.print("\n🎯 [bold cyan]Guided Setup - Customize Your Configuration[/bold cyan]")
+    console.print("")
+    
+    # Choose API type
+    console.print("What type of API are you optimizing?")
+    console.print("1. LLM Chat API (OpenAI-style responses)")
+    console.print("2. Agent API (LLM with tools/functions)")
+    console.print("3. Web Automation (browser control)")
+    console.print("4. Generic REST API")
+    console.print("")
+    
+    api_choice = Prompt.ask("Select API type", choices=["1", "2", "3", "4"], default="1")
+    
+    # Get basic info (simplified)
+    console.print("")
+    console.print("[bold yellow]⚠️  Enter the ENVIRONMENT VARIABLE NAME (default is API_KEY)[/bold yellow]")
+    console.print("[dim]NOT the actual API key value! You'll need to export it in your terminal.[/dim]")
+    console.print("")
+    api_key_env = Prompt.ask("API key env var name", default="API_KEY")
+    console.print("")
+    console.print("[dim]Optional: Describe what your API does to help generate relevant test cases.[/dim]")
+    description = Prompt.ask("What does your API do?", default="API optimization")
+    
+    # Map API choice to template type
+    template_mapping = {
+        "1": "llm_chat",
+        "2": "agno_agent", 
+        "3": "web_automation",
+        "4": "llm_chat"  # Fallback to LLM chat for generic REST
+    }
+    
+    template_type = template_mapping[api_choice]
+    
+    # Use the custom template generator with the selected type
+    from .custom_template_generator import CustomTemplateGenerator
+    generator = CustomTemplateGenerator()
+    
+    # Generate template using the selected type
+    template = generator.templates[template_type]
+    
+    # For guided setup, use a generic endpoint since we don't always have one
+    endpoint = "https://api.example.com/v1/chat" if template_type == "llm_chat" else "https://api.example.com/v1/agent"
+    
+    config = template.generate_config(endpoint, api_key_env, description)
+    test_cases = template.generate_test_cases(description)
+    evaluator_code = template.generate_evaluator()
+    
+    # Show what we're generating
+    console.print("")
+    console.print(f"📋 [bold]Generating {template_type.replace('_', ' ').title()} Template[/bold]")
+    console.print("")
+    console.print("Files to be created:")
+    console.print("  • optimization.yaml - Main configuration")
+    console.print("  • test_cases.json - Test cases for your API")
+    console.print("  • evaluator.py - Custom scoring logic")
+    console.print("  • README.md - Setup instructions")
+    console.print("")
+    console.print(f"API key env var: {api_key_env}")
+    console.print(f"Description: {description}")
+    console.print("")
+    
+    if Confirm.ask("Create these files?"):
+        return await generator._save_template_files(config, test_cases, evaluator_code, output_dir, template_type)
+    else:
+        console.print("Setup cancelled.")
+        return {
+            'spec_path': 'cancelled',
+            'config_path': None,
+            'tests_path': None,
+            'test_cases': [],
+            'config': {},
+            'elapsed': 0.0
+        }
+
+
+async def run_custom_template_setup(project_dir: Path, output_dir: Path) -> Dict[str, Any]:
+    """Run custom template setup using proven patterns."""
+    from .custom_template_generator import CustomTemplateGenerator
+    
+    generator = CustomTemplateGenerator()
+    return await generator.generate_custom_template(project_dir, output_dir)
 
 
 async def _gather_config_preferences(console: Console, template: Dict[str, Any]) -> Dict[str, Any]:
