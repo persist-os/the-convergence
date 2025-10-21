@@ -22,7 +22,6 @@ from .config_validator import ConfigValidator
 from .evolution import EvolutionEngine, ConfigurationAnalyzer
 from .test_case_evolution import TestCaseEvolutionEngine, TestCaseAnalyzer
 from .rl_optimizer import RLMetaOptimizer
-from .real_rl_optimizer import RealRLOptimizer
 from .response_utils import extract_response_text
 from ..plugins.mab.thompson_sampling import ThompsonSamplingStrategy
 from ..storage import get_storage_registry
@@ -122,15 +121,6 @@ class OptimizationRunner:
                 search_space=config.search_space,
                 min_episodes_for_training=50
             )
-            
-            # REAL RL: Neural network-based reinforcement learning
-            self.real_rl_optimizer = RealRLOptimizer(
-                search_space=config.search_space.dict(),
-                learning_rate=0.001,
-                gamma=0.99,
-                batch_size=16
-            )
-            console.print("[green]✅ REAL RL Optimizer initialized with neural networks[/green]")
         
         # Agent society components (RLP + SAO)
         self.rlp_agent = None
@@ -602,78 +592,6 @@ class OptimizationRunner:
                         generation=generation
                     )
             
-            # Record REAL RL experiences
-            if hasattr(self, 'real_rl_optimizer') and self.real_rl_optimizer:
-                print("🧠 REAL RL: Recording experiences...")
-                for i, (config, score, history_entry) in enumerate(zip(population, scores, generation_history)):
-                    # Create state representation
-                    state = {
-                        'best_score': self.best_score,
-                        'generation': generation,
-                        'history_size': len(self.history),
-                        'improvement': score - self.best_score,
-                        'diversity': 0.5,  # Placeholder
-                        'exploration_rate': 0.3,
-                        'temperature': config.get('temperature', 0.5),
-                        'max_tokens': config.get('max_tokens', 200),
-                        'model_index': 0,
-                        'episode_count': len(self.history)
-                    }
-                    
-                    # Convert config to action (simplified)
-                    action = self._config_to_action(config)
-                    
-                    # Calculate reward
-                    reward = score  # Use score as reward
-                    
-                    # Next state
-                    next_state = state.copy()
-                    next_state['best_score'] = max(self.best_score, score)
-                    
-                    # Record experience
-                    self.real_rl_optimizer.record_experience(
-                        state=state,
-                        action=action,
-                        reward=reward,
-                        next_state=next_state,
-                        done=(generation == self.config.optimization.evolution.generations - 1)
-                    )
-                
-                # Train REAL RL policy if ready
-                if self.real_rl_optimizer.is_ready_for_training():
-                    print("🎯 REAL RL: Training neural network policy...")
-                    training_stats = self.real_rl_optimizer.train_policy()
-                    
-                    # Log REAL RL training to W&B
-                    if WEAVE_AVAILABLE and weave:
-                        @weave.op()
-                        def log_real_rl_training(
-                            generation: int,
-                            loss: float,
-                            episodes: int,
-                            avg_reward: float,
-                            buffer_size: int
-                        ):
-                            return {
-                                "generation": generation,
-                                "rl_loss": loss,
-                                "rl_episodes": episodes,
-                                "rl_avg_reward": avg_reward,
-                                "rl_buffer_size": buffer_size,
-                                "rl_active": True,
-                                "neural_network_training": True
-                            }
-                        
-                        log_real_rl_training(
-                            generation=generation,
-                            loss=training_stats.get('loss', 0),
-                            episodes=training_stats.get('episodes', 0),
-                            avg_reward=training_stats.get('avg_reward', 0),
-                            buffer_size=training_stats.get('buffer_size', 0)
-                        )
-                    
-                    print(f"   📊 REAL RL Stats: Loss={training_stats.get('loss', 0):.4f}, Episodes={training_stats.get('episodes', 0)}")
-            
             # Train RL policy if ready
             if self.rl_optimizer and not self.rl_optimizer.policy:
                 if self.rl_optimizer.is_ready_for_training():
@@ -813,9 +731,6 @@ class OptimizationRunner:
             if self.rl_optimizer and self.rl_optimizer.policy:
                 stats = self.rl_optimizer.get_statistics()
                 print(f"   • RL Meta-Policy: Trained (v{stats['policy_version']})")
-            if hasattr(self, 'real_rl_optimizer') and self.real_rl_optimizer:
-                rl_stats = self.real_rl_optimizer.get_statistics()
-                print(f"   • REAL RL Neural Network: {rl_stats['episode_count']} episodes trained")
         
         print("\n" + "=" * 70)
         
@@ -823,15 +738,6 @@ class OptimizationRunner:
         await self._cleanup()
         
         return result
-    
-    def _config_to_action(self, config: Dict[str, Any]) -> int:
-        """Convert configuration to action index for REAL RL."""
-        # Simple mapping: use temperature as primary action
-        temperature = config.get('temperature', 0.5)
-        
-        # Map temperature to action index (0-6 for 0.0-0.6 range)
-        action = int(temperature * 10)  # 0.0->0, 0.1->1, ..., 0.6->6
-        return min(action, 6)  # Cap at 6
     
     async def _evaluate_generation(
         self,
