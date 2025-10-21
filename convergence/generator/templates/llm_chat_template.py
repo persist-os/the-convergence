@@ -11,11 +11,15 @@ import json
 class LLMChatTemplate:
     """Template for OpenAI-compatible chat APIs."""
     
-    def generate_config(self, endpoint: str, api_key_env: str, description: str) -> Dict[str, Any]:
+    def generate_config(self, endpoint: str, api_key_env: str, description: str, provider_name: str = "openai", models: List[str] = None) -> Dict[str, Any]:
         """Generate LLM chat API configuration."""
+        # Use provided models or fallback to defaults
+        if models is None:
+            models = ['gpt-4o', 'gpt-4o-mini', 'gpt-3.5-turbo']
+        
         return {
             'api': {
-                'name': 'custom_llm_chat',
+                'name': f'custom_{provider_name}_chat',
                 'endpoint': endpoint or 'https://api.example.com/v1/chat/completions',
                 'auth': {'type': 'bearer', 'token_env': api_key_env},
                 'request': {'method': 'POST', 'headers': {'Content-Type': 'application/json'}},
@@ -23,17 +27,23 @@ class LLMChatTemplate:
             },
             'search_space': {
                 'parameters': {
-                    'model': {'type': 'categorical', 'values': ['gpt-4o', 'gpt-4o-mini', 'gpt-3.5-turbo']},
+                    'model': {'type': 'categorical', 'values': models},
                     'temperature': {'type': 'continuous', 'min': 0.1, 'max': 1.0, 'step': 0.1},
                     'max_tokens': {'type': 'discrete', 'values': [100, 256, 512, 1024]}
                 }
             },
             'evaluation': {
                 'test_cases': {'path': 'test_cases.json'},
+                'custom_evaluator': {
+                    'enabled': True,
+                    'module': 'evaluator',
+                    'function': 'score_custom_llm_response'
+                },
                 'metrics': {
                     'response_quality': {'weight': 0.40, 'type': 'higher_is_better', 'function': 'custom'},
-                    'latency_ms': {'weight': 0.30, 'type': 'lower_is_better', 'threshold': 2000},
-                    'cost_per_call': {'weight': 0.30, 'type': 'lower_is_better', 'budget_per_call': 0.01}
+                    'latency_ms': {'weight': 0.25, 'type': 'lower_is_better', 'threshold': 5000},
+                    'cost_per_call': {'weight': 0.20, 'type': 'lower_is_better', 'budget_per_call': 0.1},
+                    'token_efficiency': {'weight': 0.15, 'type': 'higher_is_better', 'function': 'custom'}
                 }
             },
             'optimization': {
@@ -87,51 +97,85 @@ class LLMChatTemplate:
         if any(word in description_lower for word in ['chat', 'chatbot', 'conversation', ' support']):
             base_tests.extend([
                 {
-                    "id": "chat_response",
-                    "description": "Basic chat response",
-                    "input": {"messages": [{"role": "user", "content": "Hello, how are you?"}]},
-                    "expected": {"min_length": 10, "min_quality_score": 0.7},
+                    "id": "greeting_response",
+                    "description": "Basic greeting response",
+                    "input": {"messages": [{"role": "user", "content": "Hello, how are you today?"}]},
+                    "expected": {"min_length": 10, "min_quality_score": 0.7, "format": "text"},
                     "metadata": {"category": "chat", "difficulty": "easy", "weight": 1.0}
                 },
                 {
                     "id": "help_request",
                     "description": "Help request handling",
                     "input": {"messages": [{"role": "user", "content": "Can you help me with my problem?"}]},
-                    "expected": {"contains": ["help"], "min_length": 15, "min_quality_score": 0.75},
+                    "expected": {"contains": ["help"], "min_length": 15, "min_quality_score": 0.75, "format": "text"},
                     "metadata": {"category": "support", "difficulty": "easy", "weight": 1.0}
+                },
+                {
+                    "id": "conversation_continuity",
+                    "description": "Multi-turn conversation",
+                    "input": {
+                        "messages": [
+                            {"role": "user", "content": "What's the weather like?"},
+                            {"role": "assistant", "content": "I don't have access to real-time weather data."},
+                            {"role": "user", "content": "Can you suggest some indoor activities then?"}
+                        ]
+                    },
+                    "expected": {"min_length": 20, "min_quality_score": 0.8, "format": "text"},
+                    "metadata": {"category": "conversation", "difficulty": "medium", "weight": 1.2}
                 }
             ])
         
         if any(word in description_lower for word in ['creative', 'writing', 'story', 'content']):
             base_tests.extend([
                 {
-                    "id": "creative_writing",
-                    "description": "Creative text generation",
-                    "input": {"messages": [{"role": "user", "content": "Write a short story about a robot"}]},
-                    "expected": {"contains": ["robot"], "min_length": 20, "min_quality_score": 0.75},
+                    "id": "bedtime_story",
+                    "description": "Simple creative text generation",
+                    "input": {"messages": [{"role": "user", "content": "Write a one-sentence bedtime story about a unicorn."}]},
+                    "expected": {"contains": ["unicorn"], "min_length": 1, "format": "text", "min_quality_score": 0.8},
                     "metadata": {"category": "creative", "difficulty": "easy", "weight": 1.0}
+                },
+                {
+                    "id": "constrained_creativity",
+                    "description": "Creative writing with multiple constraints",
+                    "input": {"messages": [{"role": "user", "content": "Write a haiku about artificial intelligence that includes the word 'dream' and references the color blue. Make it philosophical."}]},
+                    "expected": {"contains": ["dream", "blue"], "min_length": 15, "max_length": 200, "format": "text", "min_quality_score": 0.80, "max_latency_ms": 3500},
+                    "metadata": {"category": "creative", "difficulty": "medium-hard", "weight": 2.0}
                 }
             ])
         
         if any(word in description_lower for word in ['qa', 'question', 'answer', 'knowledge']):
             base_tests.extend([
                 {
-                    "id": "factual_qa",
-                    "description": "Question answering", 
-                    "input": {"messages": [{"role": "user", "content": "What is the capital of Japan?"}]},
-                    "expected": {"contains": ["Tokyo"], "min_length": 5, "min_quality_score": 0.95},
+                    "id": "capital_question",
+                    "description": "Simple factual question",
+                    "input": {"messages": [{"role": "user", "content": "What is the capital of Senegal?"}]},
+                    "expected": {"contains": ["Dakar"], "min_length": 5, "format": "text", "min_quality_score": 0.95},
                     "metadata": {"category": "qa", "difficulty": "easy", "weight": 1.0}
+                },
+                {
+                    "id": "multi_step_reasoning",
+                    "description": "Complex multi-step reasoning with ambiguity",
+                    "input": {"messages": [{"role": "user", "content": "A restaurant has a special: Buy 3 items, get 25% off the total. Items cost: Pizza $12, Salad $8, Drink $3, Dessert $6. If Alice has $25 and wants to maximize her food value while staying under budget, what should she order? Explain your reasoning step by step."}]},
+                    "expected": {"contains": ["Pizza", "total", "$"], "min_length": 50, "format": "text", "min_quality_score": 0.75, "max_latency_ms": 4000, "max_cost_usd": 0.02},
+                    "metadata": {"category": "reasoning", "difficulty": "hard", "weight": 2.5}
                 }
             ])
         
         if any(word in description_lower for word in ['math', 'calculation', 'reasoning', 'problem']):
             base_tests.extend([
                 {
-                    "id": "math_reasoning",
-                    "description": "Math problem solving",
-                    "input": {"messages": [{"role": "user", "content": "A car travels at 80 km/h for 3 hours. How far does it travel?"}]},
-                    "expected": {"contains": ["240"], "min_length": 10, "min_quality_score": 0.9},
+                    "id": "math_problem",
+                    "description": "Basic math reasoning",
+                    "input": {"messages": [{"role": "user", "content": "If a train travels 60 mph for 2 hours, how far does it go?"}]},
+                    "expected": {"contains": ["120"], "min_length": 10, "format": "text", "min_quality_score": 0.9},
                     "metadata": {"category": "reasoning", "difficulty": "medium", "weight": 1.5}
+                },
+                {
+                    "id": "logic_riddle",
+                    "description": "Logic puzzle requiring step-by-step reasoning",
+                    "input": {"messages": [{"role": "user", "content": "Sarah has 3 cats and 2 dogs. Each cat hates 1 dog and each dog fears 2 cats. If animals that hate/fear each other can't be in the same room, what's the maximum number of animals that can be in one room together?"}]},
+                    "expected": {"contains": ["3"], "min_length": 20, "format": "text", "min_quality_score": 0.85, "max_latency_ms": 3000},
+                    "metadata": {"category": "logic", "difficulty": "medium", "weight": 1.5}
                 }
             ])
         
@@ -139,18 +183,25 @@ class LLMChatTemplate:
         if not base_tests:
             base_tests = [
                 {
-                    "id": "general_response",
-                    "description": "General API response",
-                    "input": {"messages": [{"role": "user", "content": "Test message"}]},
-                    "expected": {"min_length": 5, "min_quality_score": 0.6},
-                    "metadata": {"category": "general", "difficulty": "easy", "weight": 1.0}
+                    "id": "bedtime_story",
+                    "description": "Simple creative text generation",
+                    "input": {"messages": [{"role": "user", "content": "Write a one-sentence bedtime story about a unicorn."}]},
+                    "expected": {"contains": ["unicorn"], "min_length": 1, "format": "text", "min_quality_score": 0.8},
+                    "metadata": {"category": "creative", "difficulty": "easy", "weight": 1.0}
                 },
                 {
-                    "id": "detailed_response",
-                    "description": "Detailed API response",
-                    "input": {"messages": [{"role": "user", "content": "Please provide a detailed explanation"}]},
-                    "expected": {"min_length": 20, "min_quality_score": 0.7},
-                    "metadata": {"category": "general", "difficulty": "medium", "weight": 1.2}
+                    "id": "capital_question",
+                    "description": "Simple factual question",
+                    "input": {"messages": [{"role": "user", "content": "What is the capital of Senegal?"}]},
+                    "expected": {"contains": ["Dakar"], "min_length": 5, "format": "text", "min_quality_score": 0.95},
+                    "metadata": {"category": "qa", "difficulty": "easy", "weight": 1.0}
+                },
+                {
+                    "id": "math_problem",
+                    "description": "Basic math reasoning",
+                    "input": {"messages": [{"role": "user", "content": "If a train travels 60 mph for 2 hours, how far does it go?"}]},
+                    "expected": {"contains": ["120"], "min_length": 10, "format": "text", "min_quality_score": 0.9},
+                    "metadata": {"category": "reasoning", "difficulty": "medium", "weight": 1.5}
                 }
             ]
         
@@ -171,17 +222,66 @@ class LLMChatTemplate:
     def generate_evaluator(self) -> str:
         """Generate evaluator based on OpenAI example."""
         return '''"""
-Custom LLM API Evaluator
+🤖 Custom LLM API Evaluator
+
 Generated by Convergence Custom Template Generator
 
 This evaluator scores LLM responses based on proven patterns from OpenAI examples.
+
+The API response should follow OpenAI's chat completion format:
+{
+    "choices": [
+        {
+            "message": {
+                "content": "Response text here..."
+            }
+        }
+    ],
+    "usage": {
+        "prompt_tokens": 10,
+        "completion_tokens": 20,
+        "total_tokens": 30
+    }
+}
+
+This evaluator scores based on:
+- Content completeness (has required keywords?)
+- Response quality (basic text quality checks)
+- Length appropriateness (within expected bounds)
+- Token efficiency (cost optimization)
 """
 import re
 from typing import Dict, Any, Optional
 
 
-def score_custom_llm_response(result, expected, params, metric=None):
-    """Score LLM response based on proven patterns."""
+def score_custom_llm_response(
+    result: Any,
+    expected: Dict[str, Any],
+    params: Dict[str, Any],
+    metric: Optional[str] = None
+) -> float:
+    """
+    Score LLM response based on proven patterns.
+    
+    Scoring based on:
+    - Response quality: completeness, quality, length (40%)
+    - Latency: response time performance (25%)
+    - Cost: token efficiency (20%)
+    - Token efficiency: output quality per token (15%)
+    
+    Args:
+        result: API response from LLM API
+        expected: Expected criteria:
+            - contains: List of required keywords (e.g. ["Paris", "France"])
+            - min_length: Minimum character count (optional)
+            - max_length: Maximum character count (optional)
+            - min_quality_score: Minimum quality threshold (optional)
+        params: Configuration parameters used for this API call
+        metric: Specific metric to return ('response_quality', 'latency_ms', 'cost_per_call', 'token_efficiency')
+    
+    Returns:
+        Score between 0.0 and 1.0
+    """
     # Extract text from response
     text = _extract_text(result)
     if not text:
@@ -203,6 +303,7 @@ def score_custom_llm_response(result, expected, params, metric=None):
     # Latency and cost scores
     scores['latency'] = _score_latency(result, expected)
     scores['cost'] = _score_cost(result, expected)
+    scores['token_efficiency'] = _score_token_efficiency(result, expected)
     
     # Return specific metric if requested
     if metric:
@@ -216,8 +317,9 @@ def score_custom_llm_response(result, expected, params, metric=None):
     # Weighted overall score
     overall_score = (
         quality_score * 0.40 +
-        scores['latency'] * 0.30 +
-        scores['cost'] * 0.30
+        scores['latency'] * 0.25 +
+        scores['cost'] * 0.20 +
+        scores['token_efficiency'] * 0.15
     )
     
     return min(1.0, max(0.0, overall_score))
@@ -335,6 +437,39 @@ def _score_cost(result, expected):
             return max(0.0, 1.0 - penalty)
     
     return 0.5  # Default score if no cost data
+
+
+def _score_token_efficiency(result, expected):
+    """Score based on token efficiency (quality per token)."""
+    if isinstance(result, dict) and 'usage' in result:
+        usage = result['usage']
+        total_tokens = usage.get('total_tokens', 0)
+        
+        if total_tokens == 0:
+            return 0.0
+        
+        # Extract text length
+        text = _extract_text(result)
+        if not text:
+            return 0.0
+        
+        text_length = len(text)
+        
+        # Calculate tokens per character (rough estimate)
+        # Higher ratio = more efficient (more content per token)
+        efficiency_ratio = text_length / total_tokens if total_tokens > 0 else 0
+        
+        # Score based on efficiency ratio
+        if efficiency_ratio >= 4.0:  # Very efficient
+            return 1.0
+        elif efficiency_ratio >= 2.0:  # Good efficiency
+            return 0.8
+        elif efficiency_ratio >= 1.0:  # Average efficiency
+            return 0.6
+        else:  # Low efficiency
+            return 0.3
+    
+    return 0.5  # Default score if no token data
 '''
     
     def generate_yaml_content(self, config: Dict[str, Any]) -> str:
@@ -360,9 +495,20 @@ def _score_cost(result, expected):
         """Generate JSON content from test cases."""
         return json.dumps({"test_cases": test_cases}, indent=2)
     
-    def generate_readme_content(self, config: Dict[str, Any]) -> str:
+    def generate_readme_content(self, config: Dict[str, Any], provider_name: str = "openai") -> str:
         """Generate README content."""
-        return f"""# Custom LLM Chat Optimization
+        # Provider-specific instructions
+        provider_instructions = {
+            "openai": "Get your key from: https://platform.openai.com/api-keys",
+            "groq": "Get your key from: https://console.groq.com/keys", 
+            "azure": "Get your key from: https://portal.azure.com (Azure OpenAI resource)",
+            "anthropic": "Get your key from: https://console.anthropic.com/keys",
+            "custom": "Set up your custom API key environment variable"
+        }
+        
+        api_instructions = provider_instructions.get(provider_name, provider_instructions["custom"])
+        
+        return f"""# {provider_name.title()} LLM Chat Optimization
 
 This configuration optimizes API calls to **{config['api']['name']}** at `{config['api']['endpoint']}`.
 
@@ -374,6 +520,7 @@ This configuration optimizes API calls to **{config['api']['name']}** at `{confi
    ```
    
    **Important:** Replace `your-actual-api-key-value` with your real API key, not the variable name.
+   {api_instructions}
 
 2. **Update the endpoint (if needed):**
    Edit `optimization.yaml` and change the `endpoint` field to your actual API endpoint.

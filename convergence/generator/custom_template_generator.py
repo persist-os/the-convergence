@@ -115,7 +115,8 @@ class CustomTemplateGenerator:
         test_cases: List[Dict], 
         evaluator_code: str, 
         output_dir: Path,
-        template_type: str
+        template_type: str,
+        provider_name: str = "openai"
     ) -> Dict[str, Any]:
         """Save the generated template files."""
         
@@ -126,7 +127,7 @@ class CustomTemplateGenerator:
         template = self.templates[template_type]
         yaml_content = template.generate_yaml_content(config)
         json_content = template.generate_json_content(test_cases)
-        readme_content = template.generate_readme_content(config)
+        readme_content = template.generate_readme_content(config, provider_name)
         
         # Save files
         config_path = output_dir / "optimization.yaml"
