@@ -22,6 +22,7 @@ from .config_validator import ConfigValidator
 from .evolution import EvolutionEngine, ConfigurationAnalyzer
 from .test_case_evolution import TestCaseEvolutionEngine, TestCaseAnalyzer
 from .rl_optimizer import RLMetaOptimizer
+from .real_rl_optimizer import RealRLOptimizer
 from .response_utils import extract_response_text
 from ..plugins.mab.thompson_sampling import ThompsonSamplingStrategy
 from ..storage import get_storage_registry
@@ -121,6 +122,15 @@ class OptimizationRunner:
                 search_space=config.search_space,
                 min_episodes_for_training=50
             )
+            
+            # REAL RL: Neural network-based reinforcement learning
+            self.real_rl_optimizer = RealRLOptimizer(
+                search_space=config.search_space.dict(),
+                learning_rate=0.001,
+                gamma=0.99,
+                batch_size=16
+            )
+            console.print("[green]✅ REAL RL Optimizer initialized with neural networks[/green]")
         
         # Agent society components (RLP + SAO)
         self.rlp_agent = None
@@ -520,6 +530,47 @@ class OptimizationRunner:
                     done=(generation == self.config.optimization.evolution.generations - 1)
                 )
                 
+                # Log detailed RLP metrics to W&B
+                if WEAVE_AVAILABLE and weave:
+                    @weave.op()
+                    def log_rlp_training(
+                        generation: int,
+                        thought: str,
+                        reward: float,
+                        normalized_reward: float,
+                        rlp_stats: Dict[str, Any],
+                        best_score: float,
+                        config_count: int,
+                        information_gain: float
+                    ):
+                        return {
+                            "generation": generation,
+                            "thought_length": len(thought),
+                            "thought_preview": thought[:100],
+                            "raw_reward": reward,
+                            "normalized_reward": normalized_reward,
+                            "information_gain": information_gain,
+                            "mean_reward": rlp_stats.get('mean_reward', 0),
+                            "reward_trend": rlp_stats.get('reward_trend', 'stable'),
+                            "total_episodes": rlp_stats.get('total_episodes', 0),
+                            "buffer_size": rlp_stats.get('buffer_size', 0),
+                            "best_score": best_score,
+                            "configs_tested": config_count,
+                            "rlp_active": True
+                        }
+                    
+                    # Call the Weave-tracked function
+                    log_rlp_training(
+                        generation=generation,
+                        thought=thought,
+                        reward=information_gain,
+                        normalized_reward=updated_state.get('rlp_stats', {}).get('mean_normalized_reward', 0),
+                        rlp_stats=updated_state.get('rlp_stats', {}),
+                        best_score=current_best,
+                        config_count=len(population),
+                        information_gain=information_gain
+                    )
+                
                 # Log learning metrics
                 if 'rlp_stats' in updated_state:
                     stats = updated_state['rlp_stats']
@@ -551,6 +602,78 @@ class OptimizationRunner:
                         generation=generation
                     )
             
+            # Record REAL RL experiences
+            if hasattr(self, 'real_rl_optimizer') and self.real_rl_optimizer:
+                print("🧠 REAL RL: Recording experiences...")
+                for i, (config, score, history_entry) in enumerate(zip(population, scores, generation_history)):
+                    # Create state representation
+                    state = {
+                        'best_score': self.best_score,
+                        'generation': generation,
+                        'history_size': len(self.history),
+                        'improvement': score - self.best_score,
+                        'diversity': 0.5,  # Placeholder
+                        'exploration_rate': 0.3,
+                        'temperature': config.get('temperature', 0.5),
+                        'max_tokens': config.get('max_tokens', 200),
+                        'model_index': 0,
+                        'episode_count': len(self.history)
+                    }
+                    
+                    # Convert config to action (simplified)
+                    action = self._config_to_action(config)
+                    
+                    # Calculate reward
+                    reward = score  # Use score as reward
+                    
+                    # Next state
+                    next_state = state.copy()
+                    next_state['best_score'] = max(self.best_score, score)
+                    
+                    # Record experience
+                    self.real_rl_optimizer.record_experience(
+                        state=state,
+                        action=action,
+                        reward=reward,
+                        next_state=next_state,
+                        done=(generation == self.config.optimization.evolution.generations - 1)
+                    )
+                
+                # Train REAL RL policy if ready
+                if self.real_rl_optimizer.is_ready_for_training():
+                    print("🎯 REAL RL: Training neural network policy...")
+                    training_stats = self.real_rl_optimizer.train_policy()
+                    
+                    # Log REAL RL training to W&B
+                    if WEAVE_AVAILABLE and weave:
+                        @weave.op()
+                        def log_real_rl_training(
+                            generation: int,
+                            loss: float,
+                            episodes: int,
+                            avg_reward: float,
+                            buffer_size: int
+                        ):
+                            return {
+                                "generation": generation,
+                                "rl_loss": loss,
+                                "rl_episodes": episodes,
+                                "rl_avg_reward": avg_reward,
+                                "rl_buffer_size": buffer_size,
+                                "rl_active": True,
+                                "neural_network_training": True
+                            }
+                        
+                        log_real_rl_training(
+                            generation=generation,
+                            loss=training_stats.get('loss', 0),
+                            episodes=training_stats.get('episodes', 0),
+                            avg_reward=training_stats.get('avg_reward', 0),
+                            buffer_size=training_stats.get('buffer_size', 0)
+                        )
+                    
+                    print(f"   📊 REAL RL Stats: Loss={training_stats.get('loss', 0):.4f}, Episodes={training_stats.get('episodes', 0)}")
+            
             # Train RL policy if ready
             if self.rl_optimizer and not self.rl_optimizer.policy:
                 if self.rl_optimizer.is_ready_for_training():
@@ -581,6 +704,39 @@ class OptimizationRunner:
                             # Store in SAO dataset
                             sao_stats = self.sao_agent.get_generation_stats()
                             print(f"   📈 SAO Dataset: {sao_stats['dataset_size']} total samples")
+                            
+                            # Log detailed SAO metrics to W&B
+                            if WEAVE_AVAILABLE and weave:
+                                @weave.op()
+                                def log_sao_generation(
+                                    generation: int,
+                                    synthetic_samples: int,
+                                    sao_stats: Dict[str, Any],
+                                    optimization_history_size: int,
+                                    best_score: float
+                                ):
+                                    return {
+                                        "generation": generation,
+                                        "synthetic_samples_generated": synthetic_samples,
+                                        "total_dataset_size": sao_stats.get('dataset_size', 0),
+                                        "unique_prompts": sao_stats.get('unique_prompts', 0),
+                                        "diversity_score": sao_stats.get('diversity_score', 0),
+                                        "quality_filtered": sao_stats.get('quality_filtered', 0),
+                                        "duplicates_filtered": sao_stats.get('duplicates_filtered', 0),
+                                        "rounds_completed": sao_stats.get('rounds_completed', 0),
+                                        "optimization_history_size": optimization_history_size,
+                                        "best_score": best_score,
+                                        "sao_active": True
+                                    }
+                                
+                                # Call the Weave-tracked function
+                                log_sao_generation(
+                                    generation=generation,
+                                    synthetic_samples=len(synthetic_data),
+                                    sao_stats=sao_stats,
+                                    optimization_history_size=len(self.history),
+                                    best_score=self.best_score
+                                )
                         else:
                             print("   ⚠️ SAO generation failed")
                     else:
@@ -648,12 +804,18 @@ class OptimizationRunner:
         if self.config.society and self.config.society.enabled:
             print(f"\n🤖 AGENT SOCIETY CONTRIBUTIONS:")
             if self.rlp_agent:
-                print(f"   • RLP (Reasoning): Active")
+                rlp_stats = getattr(self.rlp_agent, 'experience_buffer', None)
+                episodes = len(rlp_stats.buffer) if rlp_stats else 0
+                print(f"   • RLP (Reasoning): Active - {episodes} experiences learned")
             if self.sao_agent:
-                print(f"   • SAO (Self-Improvement): Active")
+                sao_stats = self.sao_agent.get_generation_stats()
+                print(f"   • SAO (Self-Improvement): Active - {sao_stats['dataset_size']} synthetic samples")
             if self.rl_optimizer and self.rl_optimizer.policy:
                 stats = self.rl_optimizer.get_statistics()
                 print(f"   • RL Meta-Policy: Trained (v{stats['policy_version']})")
+            if hasattr(self, 'real_rl_optimizer') and self.real_rl_optimizer:
+                rl_stats = self.real_rl_optimizer.get_statistics()
+                print(f"   • REAL RL Neural Network: {rl_stats['episode_count']} episodes trained")
         
         print("\n" + "=" * 70)
         
@@ -661,6 +823,15 @@ class OptimizationRunner:
         await self._cleanup()
         
         return result
+    
+    def _config_to_action(self, config: Dict[str, Any]) -> int:
+        """Convert configuration to action index for REAL RL."""
+        # Simple mapping: use temperature as primary action
+        temperature = config.get('temperature', 0.5)
+        
+        # Map temperature to action index (0-6 for 0.0-0.6 range)
+        action = int(temperature * 10)  # 0.0->0, 0.1->1, ..., 0.6->6
+        return min(action, 6)  # Cap at 6
     
     async def _evaluate_generation(
         self,

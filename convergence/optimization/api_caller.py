@@ -257,12 +257,39 @@ class APICaller:
         if not WEAVE_AVAILABLE or not weave:
             return await self._call_impl(endpoint, method, params, auth, headers, timeout)
         
-        # Decorate the implementation dynamically
+        # Decorate the implementation with proper parameters for Weave tracking
         @weave.op()
-        async def tracked_call():
-            return await self._call_impl(endpoint, method, params, auth, headers, timeout)
+        async def tracked_call(
+            endpoint: str,
+            method: str,
+            params: Dict[str, Any],
+            auth: Optional[Dict[str, str]] = None,
+            headers: Optional[Dict[str, str]] = None,
+            timeout: Optional[int] = None,
+        ):
+            # Add metadata for better trace visibility
+            weave_context = {
+                "api_endpoint": endpoint,
+                "http_method": method,
+                "request_params": params,
+                "auth_type": auth.get("type") if auth else None,
+                "timeout": timeout,
+                "timestamp": time.time()
+            }
+            
+            result = await self._call_impl(endpoint, method, params, auth, headers, timeout)
+            
+            # Add response metadata
+            weave_context.update({
+                "success": result.success,
+                "latency_ms": result.latency_ms,
+                "cost_usd": result.estimated_cost_usd,
+                "error": result.error
+            })
+            
+            return result
         
-        return await tracked_call()
+        return await tracked_call(endpoint, method, params, auth, headers, timeout)
     
     async def close(self):
         """Close HTTP client."""
