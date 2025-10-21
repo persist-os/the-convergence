@@ -175,6 +175,13 @@ def _register_builtin_backends() -> None:
         StorageRegistry.register("postgres", PostgresStorage)
     except ImportError:
         pass  # Postgres is optional
+    
+    # Try to register Convex (requires backend integration)
+    try:
+        from convergence.storage.convex import ConvexStorage
+        StorageRegistry.register("convex", ConvexStorage)
+    except ImportError:
+        pass  # Convex is optional
 
 
 # Register built-in backends on module import

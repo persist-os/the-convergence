@@ -196,11 +196,21 @@ class OptimizationRunner:
             path = "./data/optimization"
         
         registry = get_storage_registry()
-        self.storage = registry.get(
-            backend,
-            sqlite_path=f"{path}/optimization.db",
-            file_base_dir=f"{path}/files"
-        )
+        
+        # Pass appropriate parameters based on backend type
+        if backend == "convex":
+            # Convex storage - no file paths needed, uses auto-import
+            self.storage = registry.get(backend)
+        elif backend in ["multi", "sqlite", "file"]:
+            # File-based storage - needs paths
+            self.storage = registry.get(
+                backend,
+                sqlite_path=f"{path}/optimization.db",
+                file_base_dir=f"{path}/files"
+            )
+        else:
+            # Generic - let registry handle it
+            self.storage = registry.get(backend)
     
     def _detect_adapter(self, api_name: str, config_file_path: Optional[Path] = None):
         """Detect and return appropriate API adapter based on API name."""
