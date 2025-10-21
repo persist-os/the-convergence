@@ -2,8 +2,10 @@
 Interactive setup for Convergence when no OpenAPI spec is found.
 
 Provides:
-1. Fetch from URL
-2. Use preset template (OpenAI)
+1. AI-Powered Setup - Natural language interface
+2. Guided Setup - Step-by-step questions
+3. Preset Template - Working examples
+4. Custom Template - Proven patterns
 """
 from pathlib import Path
 from typing import Dict, Any
@@ -35,22 +37,25 @@ async def run_interactive_setup(project_dir: Path, output_dir: Path) -> Dict[str
     # Step 1: Choose setup approach
     console.print("[bold cyan]Choose your starting point:[/bold cyan]")
     console.print("")
-    console.print("1. Guided Setup - Answer a few questions, we'll fill the rest")
-    console.print("2. Use Preset Template - Start from working examples")
-    console.print("3. Custom Template - Build from proven patterns")
+    console.print("1. AI-Powered Setup - Describe what you want in natural language")
+    console.print("2. Guided Setup - Answer a few questions, we'll fill the rest")
+    console.print("3. Use Preset Template - Start from working examples")
+    console.print("4. Custom Template - Build from proven patterns")
     console.print("")
     
     choice = Prompt.ask(
         "Select approach",
-        choices=["1", "2", "3"],
+        choices=["1", "2", "3", "4"],
         default="1"
     )
     
     if choice == "1":
-        return await run_guided_setup(project_dir, output_dir)
+        return await run_ai_powered_setup(project_dir, output_dir)
     elif choice == "2":
-        return await run_preset_template_setup(project_dir, output_dir)
+        return await run_guided_setup(project_dir, output_dir)
     elif choice == "3":
+        return await run_preset_template_setup(project_dir, output_dir)
+    elif choice == "4":
         return await run_custom_template_setup(project_dir, output_dir)
 
 
@@ -772,3 +777,10 @@ def _apply_config_overrides(config: Dict[str, Any], overrides: Dict[str, Any], s
             })
     
     return config
+
+
+# Import AI-powered setup function
+async def run_ai_powered_setup(project_dir: Path, output_dir: Path) -> Dict[str, Any]:
+    """Import and run AI-powered setup."""
+    from .ai_powered_setup import run_ai_powered_setup as _run_ai_powered_setup
+    return await _run_ai_powered_setup(project_dir, output_dir)

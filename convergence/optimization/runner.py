@@ -18,6 +18,7 @@ from .models import OptimizationSchema, APIResponse, OptimizationResult
 from .config_loader import ConfigLoader
 from .api_caller import APICaller
 from .evaluator import Evaluator
+from .config_validator import ConfigValidator
 from .evolution import EvolutionEngine, ConfigurationAnalyzer
 from .test_case_evolution import TestCaseEvolutionEngine, TestCaseAnalyzer
 from .rl_optimizer import RLMetaOptimizer
@@ -78,6 +79,17 @@ class OptimizationRunner:
         """
         self.config = config
         self.config_file_path = config_file_path
+        
+        # Validate configuration early
+        try:
+            ConfigValidator.validate_and_suggest_fixes(
+                config.dict(), 
+                str(config_file_path) if config_file_path else None
+            )
+        except Exception as e:
+            console.print(f"[red]❌ Configuration validation failed:[/red]")
+            console.print(f"[red]{e}[/red]")
+            raise
         
         # Initialize components
         self.api_caller = APICaller(timeout=config.api.request.timeout_seconds)
