@@ -484,8 +484,8 @@ optimization:
   algorithm: "mab_evolution"
   evolution:
     # Evolution settings chosen because: [explain based on user's optimization intensity and provider rate limits]
-    population_size: "[adjust based on provider: 2-3 for Groq free tier, 4-6 for rate-limited providers, 8+ for unlimited]"
-    generations: "[adjust based on provider: 2-3 for Groq free tier (max 6-8 total experiments), 3-5 for rate-limited providers, 5+ for unlimited]"
+    population_size: "[adjust based on provider: 2-3 "
+    generations: "[adjust based on provider: 2-3 "
     mutation_rate: 0.3
     crossover_rate: 0.2
     elite_size: 1
