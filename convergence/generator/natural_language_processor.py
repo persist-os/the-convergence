@@ -66,42 +66,80 @@ class NaturalLanguageProcessor:
         extraction_prompt = f"""
 Extract API configuration from: "{user_input}"
 
-Analyze the user's detailed description and extract:
+CRITICAL: Extract EXACTLY what the user mentioned. Do NOT substitute, infer, or "improve" their choices.
 
-1. API Provider (openai, groq, azure, anthropic, custom)
-2. Optimization Priority (quality, speed, cost, balanced)
-3. Use Case (creative_writing, qa, summarization, coding, etc.)
-4. Specific Requirements (response length, creativity level, etc.)
-5. Budget/Cost constraints
-6. Speed requirements
-7. Models mentioned or implied by the provider
+1. API Provider - Extract the EXACT provider name mentioned by the user
+2. Models - Extract the EXACT model names mentioned by the user (do NOT substitute with "better" models)
+3. Optimization Priority (quality, speed, cost, balanced)
+4. Use Case (creative_writing, qa, summarization, coding, marketing, etc.)
+5. Specific Requirements (response length, creativity level, etc.)
+6. Budget/Cost constraints
+7. Speed requirements
 
-CRITICAL: You MUST extract the correct endpoint and at least one model for the provider.
+MANDATORY RULES - CRITICAL MODEL PRESERVATION:
+- Preserve the user's exact model specifications
+- Research the provider's actual model names from their documentation
+- Do NOT use generic model names - use the specific model identifiers the user mentioned
+- Do NOT assume the user wants a "better" or "faster" model - use what they specified
 
-For endpoints, determine from context:
-- If user mentions "Groq", "Llama", "ultra-fast" → use "https://api.groq.com/openai/v1/chat/completions"
-- If user mentions "OpenAI", "GPT", "ChatGPT" → use "https://api.openai.com/v1/chat/completions"  
-- If user mentions "Anthropic", "Claude" → use "https://api.anthropic.com/v1/messages"
-- If user mentions "Azure" → use "https://your-resource.openai.azure.com/openai/deployments/your-model/chat/completions"
-- If user mentions a custom endpoint, use that exact endpoint
+For endpoints, research and construct the correct API endpoint format:
+- Different providers have different endpoint structures
+- Some include model names in the URL path, others don't
+- Research the specific provider's API documentation to determine the correct endpoint format
+- Use the exact model name in the endpoint if the provider requires it
+- Do NOT assume all providers follow the same endpoint pattern
 
-For models, extract from context or use provider defaults:
-- Groq: ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"]
-- OpenAI: ["gpt-4o-mini", "gpt-3.5-turbo", "gpt-4o"]
-- Anthropic: ["claude-3-haiku", "claude-3-sonnet"]
-- Azure: ["gpt-4o", "gpt-4o-mini"]
+AUTHENTICATION GUIDELINES - BE DYNAMIC AND GENERIC:
+- Research the correct authentication method for the specific provider/model
+- Different providers use different authentication formats (Bearer tokens, API keys, custom headers)
+- API key authentication typically uses custom headers like "x-api-key", "x-goog-api-key", "api-key", etc.
+- Bearer token authentication uses "Authorization: Bearer" header
+- Determine the correct header name and authentication type based on the provider's API documentation
+- Do NOT assume all providers use the same authentication format
+- Generate the authentication configuration dynamically based on the provider, not from hardcoded examples
 
-Return JSON only:
+MODEL VALIDATION REQUIREMENTS:
+- Research current model availability and deprecation status
+- Use only currently available, non-deprecated models
+- Check provider documentation for model lifecycle status
+- CRITICAL: Use the EXACT model names specified by the user
+- Do NOT substitute user's model choices with "better" or "more stable" alternatives
+- If the user specifies a model that might not be available, still use their exact specification
+
+API PAYLOAD FORMAT REQUIREMENTS:
+- Different providers use different request/response formats
+- Some use OpenAI-compatible format (messages, temperature, max_tokens)
+- Others use custom formats (contents, generationConfig, etc.)
+- Research the specific provider's API documentation for correct payload structure
+- Do NOT assume all providers follow OpenAI's format
+- Generate payload structure dynamically based on provider requirements
+
+RATE LIMITING CONSIDERATIONS:
+- Research provider-specific rate limits (RPM, TPM, etc.)
+- Adjust optimization parameters to respect rate limits
+- Use fewer parallel workers for rate-limited providers (1-2 for free tiers, higher for paid)
+- Consider longer delays between requests for free tiers
+- Prefer providers with higher rate limits for thorough optimization
+- For Groq free tier: Use 1-2 parallel workers max, reduce experiments_per_generation to 2-4 max
+- For providers with strict limits: Prioritize quality over quantity of experiments
+- CRITICAL: Cap total experiments to 6-8 for free tier providers to avoid rate limits
+- Use fewer generations (2-3) for rate-limited providers instead of 5+
+
+For API key environment variables:
+- Follow standard naming: PROVIDER_API_KEY
+- Use uppercase with underscores
+
+Return JSON with EXACT user specifications:
 {{
     "api_type": "llm_chat",
-    "provider": "openai",
-    "endpoint": "https://api.openai.com/v1/chat/completions",
-    "api_key_env": "OPENAI_API_KEY",
-    "models": ["gpt-4o-mini", "gpt-3.5-turbo"],
-    "use_case": "creative writing",
-    "optimization_goal": "quality",
+    "provider": "[EXACT provider from user input - do not change]",
+    "endpoint": "[correct endpoint format with exact model if needed]",
+    "api_key_env": "[appropriate env var for the provider]",
+    "models": ["[EXACT model names from user input - do not substitute]"],
+    "use_case": "[extract use case from user input]",
+    "optimization_goal": "[extract priority from user input]",
     "intensity": "thorough",
-    "test_scenarios": ["creative writing", "story generation"],
+    "test_scenarios": ["[generate relevant test scenarios]"],
     "metrics": {{
         "quality_weight": 0.6,
         "latency_weight": 0.2,
@@ -122,10 +160,10 @@ Return JSON only:
         }}
     }},
     "requirements": {{
-        "response_length": "200-500 words",
-        "creativity_level": "high",
-        "cost_budget": "moderate",
-        "speed_requirement": "not critical"
+        "response_length": "[extract from user input]",
+        "creativity_level": "[extract from user input]",
+        "cost_budget": "[extract from user input]",
+        "speed_requirement": "[extract from user input]"
     }}
 }}"""
 
@@ -180,17 +218,83 @@ Return JSON only:
                     try:
                         extracted_info = json.loads(reconstructed)
                     except:
-                        # Fallback: create a basic extraction
+                        # Fallback: create a basic extraction based on user input
+                        # Try to extract provider and models from user input for fallback
+                        user_lower = user_input.lower()
+                        
+                        # Extract exact model names mentioned by user
+                        import re
+                        model_patterns = [
+                            r'gemini[-\s]?2\.5', r'gemini[-\s]?2\.0', r'gemini[-\s]?1\.5', r'gemini[-\s]?pro',
+                            r'gpt[-\s]?4', r'gpt[-\s]?3\.5', r'gpt[-\s]?4o',
+                            r'claude[-\s]?3', r'claude[-\s]?2', r'claude[-\s]?haiku', r'claude[-\s]?sonnet',
+                            r'llama[-\s]?3', r'llama[-\s]?2', r'mistral[-\s]?7b', r'mistral[-\s]?8b'
+                        ]
+                        
+                        extracted_models = []
+                        for pattern in model_patterns:
+                            matches = re.findall(pattern, user_lower)
+                            if matches:
+                                extracted_models.extend(matches)
+                        
+                        if 'gemini' in user_lower or 'google' in user_lower:
+                            fallback_provider = "gemini"
+                            if extracted_models:
+                                # Use the first extracted model
+                                model = extracted_models[0].replace(' ', '-').replace('_', '-')
+                                fallback_endpoint = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+                                fallback_models = [model]
+                            else:
+                                fallback_endpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5:generateContent"
+                                fallback_models = ["gemini-2.5"]
+                            fallback_api_key = "GOOGLE_API_KEY"
+                        elif 'openai' in user_lower or 'gpt' in user_lower:
+                            fallback_provider = "openai"
+                            fallback_endpoint = "https://api.openai.com/v1/chat/completions"
+                            fallback_api_key = "OPENAI_API_KEY"
+                            if extracted_models:
+                                fallback_models = [extracted_models[0].replace(' ', '-').replace('_', '-')]
+                            else:
+                                fallback_models = ["gpt-4"]
+                        elif 'groq' in user_lower or 'llama' in user_lower:
+                            fallback_provider = "groq"
+                            fallback_endpoint = "https://api.groq.com/openai/v1/chat/completions"
+                            fallback_api_key = "GROQ_API_KEY"
+                            if extracted_models:
+                                # Use the EXACT model name specified by the user
+                                model = extracted_models[0].replace(' ', '-').replace('_', '-')
+                                # Preserve the user's exact model specification
+                                fallback_models = [model]
+                            else:
+                                fallback_models = ["llama-3.1-8b-instant"]
+                        elif 'anthropic' in user_lower or 'claude' in user_lower:
+                            fallback_provider = "anthropic"
+                            fallback_endpoint = "https://api.anthropic.com/v1/messages"
+                            fallback_api_key = "ANTHROPIC_API_KEY"
+                            if extracted_models:
+                                fallback_models = [extracted_models[0].replace(' ', '-').replace('_', '-')]
+                            else:
+                                fallback_models = ["claude-3"]
+                        else:
+                            # Generic fallback
+                            fallback_provider = "custom"
+                            fallback_endpoint = "https://api.example.com/v1/chat/completions"
+                            fallback_api_key = "API_KEY"
+                            if extracted_models:
+                                fallback_models = [extracted_models[0].replace(' ', '-').replace('_', '-')]
+                            else:
+                                fallback_models = ["model1"]
+                        
                         extracted_info = {
                             "api_type": "llm_chat",
-                            "provider": "openai",
-                            "endpoint": "https://api.openai.com/v1/chat/completions",
-                            "api_key_env": "OPENAI_API_KEY",
-                            "models": ["gpt-4o-mini", "gpt-3.5-turbo"],
-                            "use_case": "creative writing",
-                            "optimization_goal": "quality",
+                            "provider": fallback_provider,
+                            "endpoint": fallback_endpoint,
+                            "api_key_env": fallback_api_key,
+                            "models": fallback_models,
+                            "use_case": "API optimization",
+                            "optimization_goal": "balanced",
                             "intensity": "thorough",
-                            "test_scenarios": ["creative writing", "story generation"],
+                            "test_scenarios": ["general testing"],
                             "metrics": {"quality_weight": 0.6, "latency_weight": 0.2, "cost_weight": 0.2},
                             "search_space": {
                                 "parameters": {
@@ -201,17 +305,82 @@ Return JSON only:
                             "requirements": {"response_length": "200-500 words", "creativity_level": "high", "cost_budget": "moderate", "speed_requirement": "not critical"}
                         }
                 else:
-                    # Complete fallback
+                    # Complete fallback - try to extract provider and models from user input
+                    user_lower = user_input.lower()
+                    
+                    # Extract exact model names mentioned by user
+                    import re
+                    model_patterns = [
+                        r'gemini[-\s]?2\.5', r'gemini[-\s]?2\.0', r'gemini[-\s]?1\.5', r'gemini[-\s]?pro',
+                        r'gpt[-\s]?4', r'gpt[-\s]?3\.5', r'gpt[-\s]?4o',
+                        r'claude[-\s]?3', r'claude[-\s]?2', r'claude[-\s]?haiku', r'claude[-\s]?sonnet',
+                        r'llama[-\s]?3', r'llama[-\s]?2', r'mistral[-\s]?7b', r'mistral[-\s]?8b'
+                    ]
+                    
+                    extracted_models = []
+                    for pattern in model_patterns:
+                        matches = re.findall(pattern, user_lower)
+                        if matches:
+                            extracted_models.extend(matches)
+                    
+                    if 'gemini' in user_lower or 'google' in user_lower:
+                        fallback_provider = "gemini"
+                        if extracted_models:
+                            # Use the first extracted model
+                            model = extracted_models[0].replace(' ', '-').replace('_', '-')
+                            fallback_endpoint = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+                            fallback_models = [model]
+                        else:
+                            fallback_endpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5:generateContent"
+                            fallback_models = ["gemini-2.5"]
+                        fallback_api_key = "GOOGLE_API_KEY"
+                    elif 'openai' in user_lower or 'gpt' in user_lower:
+                        fallback_provider = "openai"
+                        fallback_endpoint = "https://api.openai.com/v1/chat/completions"
+                        fallback_api_key = "OPENAI_API_KEY"
+                        if extracted_models:
+                            fallback_models = [extracted_models[0].replace(' ', '-').replace('_', '-')]
+                        else:
+                            fallback_models = ["gpt-4"]
+                    elif 'groq' in user_lower or 'llama' in user_lower:
+                        fallback_provider = "groq"
+                        fallback_endpoint = "https://api.groq.com/openai/v1/chat/completions"
+                        fallback_api_key = "GROQ_API_KEY"
+                        if extracted_models:
+                            # Use the EXACT model name specified by the user
+                            model = extracted_models[0].replace(' ', '-').replace('_', '-')
+                            # Preserve the user's exact model specification
+                            fallback_models = [model]
+                        else:
+                            fallback_models = ["llama-3.1-8b-instant"]
+                    elif 'anthropic' in user_lower or 'claude' in user_lower:
+                        fallback_provider = "anthropic"
+                        fallback_endpoint = "https://api.anthropic.com/v1/messages"
+                        fallback_api_key = "ANTHROPIC_API_KEY"
+                        if extracted_models:
+                            fallback_models = [extracted_models[0].replace(' ', '-').replace('_', '-')]
+                        else:
+                            fallback_models = ["claude-3"]
+                    else:
+                        # Generic fallback
+                        fallback_provider = "custom"
+                        fallback_endpoint = "https://api.example.com/v1/chat/completions"
+                        fallback_api_key = "API_KEY"
+                        if extracted_models:
+                            fallback_models = [extracted_models[0].replace(' ', '-').replace('_', '-')]
+                        else:
+                            fallback_models = ["model1"]
+                    
                     extracted_info = {
                         "api_type": "llm_chat",
-                        "provider": "openai",
-                        "endpoint": "https://api.openai.com/v1/chat/completions",
-                        "api_key_env": "OPENAI_API_KEY",
-                        "models": ["gpt-4o-mini", "gpt-3.5-turbo"],
-                        "use_case": "creative writing",
-                        "optimization_goal": "quality",
+                        "provider": fallback_provider,
+                        "endpoint": fallback_endpoint,
+                        "api_key_env": fallback_api_key,
+                        "models": fallback_models,
+                        "use_case": "API optimization",
+                        "optimization_goal": "balanced",
                         "intensity": "thorough",
-                        "test_scenarios": ["creative writing", "story generation"],
+                        "test_scenarios": ["general testing"],
                         "metrics": {"quality_weight": 0.6, "latency_weight": 0.2, "cost_weight": 0.2},
                         "search_space": {
                             "parameters": {
@@ -262,15 +431,19 @@ api:
       Content-Type: "application/json"
     timeout_seconds: 30
   auth:
-    type: "bearer"
+    # Authentication type chosen because: [explain based on provider's API requirements]
+    type: "[determine correct auth type: api_key for providers using custom headers, bearer for providers using Authorization header]"
     # API key env var chosen because: [explain based on user input]
     token_env: "{extracted_info.get('api_key_env', 'API_KEY')}"
+    # Header name chosen because: [explain based on provider's API documentation - only include if type is api_key]
+    header_name: "[determine correct header name based on provider: x-goog-api-key for Google, x-api-key for others, etc.]"
   response:
     result_field: "choices[0].message.content"
 
 search_space:
   parameters:
     # Model selection chosen because: [explain based on user's provider choice and requirements]
+    # CRITICAL: Use the EXACT model names from extracted_info - do NOT substitute or change them
     model:
       type: "categorical"
       values: {extracted_info.get('models', ['gpt-4o-mini', 'gpt-3.5-turbo'])}
@@ -310,18 +483,20 @@ evaluation:
 optimization:
   algorithm: "mab_evolution"
   evolution:
-    # Evolution settings chosen because: [explain based on user's optimization intensity]
-    population_size: 4
-    generations: 3
+    # Evolution settings chosen because: [explain based on user's optimization intensity and provider rate limits]
+    population_size: "[adjust based on provider: 2-3 for Groq free tier, 4-6 for rate-limited providers, 8+ for unlimited]"
+    generations: "[adjust based on provider: 2-3 for Groq free tier (max 6-8 total experiments), 3-5 for rate-limited providers, 5+ for unlimited]"
     mutation_rate: 0.3
     crossover_rate: 0.2
     elite_size: 1
-  execution:
-    parallel_workers: 1
-    experiments_per_generation: 3
+execution:
+  # Execution settings chosen because: [explain based on provider rate limits and user requirements]
+  parallel_workers: "[determine based on provider rate limits: 1-2 for Groq free tier (30 RPM), 2-4 for paid tiers, higher for unlimited providers]"
+  # Execution settings chosen because: [explain based on optimization intensity and rate limits]
+  experiments_per_generation: "[adjust based on provider capabilities: 2-3 for Groq free tier (max 6-8 total), 4-6 for rate-limited providers, 8-12 for unlimited providers]"
 
 society:
-  enabled: false
+  enabled: true
 
 legacy:
   enabled: true"""
@@ -725,12 +900,79 @@ def _score_cost(result: Any, expected: Dict[str, Any]) -> float:
     
     def _get_fallback_extraction(self, user_input: str) -> Dict[str, Any]:
         """Fallback extraction when LLM fails."""
+        # Try to extract provider and models from user input for fallback
+        user_lower = user_input.lower()
+        
+        # Extract exact model names mentioned by user
+        import re
+        model_patterns = [
+            r'gemini[-\s]?2\.5', r'gemini[-\s]?2\.0', r'gemini[-\s]?1\.5', r'gemini[-\s]?pro',
+            r'gpt[-\s]?4', r'gpt[-\s]?3\.5', r'gpt[-\s]?4o',
+            r'claude[-\s]?3', r'claude[-\s]?2', r'claude[-\s]?haiku', r'claude[-\s]?sonnet',
+            r'llama[-\s]?3\.3[-\s]?70b[-\s]?versatile', r'llama[-\s]?3\.3', r'llama[-\s]?3', r'llama[-\s]?2', 
+            r'mistral[-\s]?7b', r'mistral[-\s]?8b'
+        ]
+        
+        extracted_models = []
+        for pattern in model_patterns:
+            matches = re.findall(pattern, user_lower)
+            if matches:
+                extracted_models.extend(matches)
+        
+        if 'gemini' in user_lower or 'google' in user_lower:
+            fallback_provider = "gemini"
+            if extracted_models:
+                # Use the first extracted model
+                model = extracted_models[0].replace(' ', '-').replace('_', '-')
+                fallback_endpoint = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+                fallback_models = [model]
+            else:
+                fallback_endpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5:generateContent"
+                fallback_models = ["gemini-2.5"]
+            fallback_api_key = "GOOGLE_API_KEY"
+        elif 'openai' in user_lower or 'gpt' in user_lower:
+            fallback_provider = "openai"
+            fallback_endpoint = "https://api.openai.com/v1/chat/completions"
+            fallback_api_key = "OPENAI_API_KEY"
+            if extracted_models:
+                fallback_models = [extracted_models[0].replace(' ', '-').replace('_', '-')]
+            else:
+                fallback_models = ["gpt-4"]
+        elif 'groq' in user_lower or 'llama' in user_lower:
+            fallback_provider = "groq"
+            fallback_endpoint = "https://api.groq.com/openai/v1/chat/completions"
+            fallback_api_key = "GROQ_API_KEY"
+            if extracted_models:
+                # Use the EXACT model name specified by the user
+                model = extracted_models[0].replace(' ', '-').replace('_', '-')
+                # Preserve the user's exact model specification
+                fallback_models = [model]
+            else:
+                fallback_models = ["llama-3.1-8b-instant"]
+        elif 'anthropic' in user_lower or 'claude' in user_lower:
+            fallback_provider = "anthropic"
+            fallback_endpoint = "https://api.anthropic.com/v1/messages"
+            fallback_api_key = "ANTHROPIC_API_KEY"
+            if extracted_models:
+                fallback_models = [extracted_models[0].replace(' ', '-').replace('_', '-')]
+            else:
+                fallback_models = ["claude-3"]
+        else:
+            # Generic fallback
+            fallback_provider = "custom"
+            fallback_endpoint = "https://api.example.com/v1/chat/completions"
+            fallback_api_key = "API_KEY"
+            if extracted_models:
+                fallback_models = [extracted_models[0].replace(' ', '-').replace('_', '-')]
+            else:
+                fallback_models = ["model1"]
+        
         return {
             "api_type": "llm_chat",
-            "provider": "openai",
-            "endpoint": "https://api.openai.com/v1/chat/completions",
-            "api_key_env": "OPENAI_API_KEY",
-            "models": ["gpt-4o-mini", "gpt-3.5-turbo"],
+            "provider": fallback_provider,
+            "endpoint": fallback_endpoint,
+            "api_key_env": fallback_api_key,
+            "models": fallback_models,
             "use_case": "API optimization",
             "optimization_goal": "balanced",
             "intensity": "balanced",
@@ -809,7 +1051,7 @@ def _score_cost(result: Any, expected: Dict[str, Any]) -> float:
                 }
             },
             'society': {
-                'enabled': False,
+                'enabled': True,
                 'model': 'gemini/gemini-2.0-flash-exp',
                 'api_key_env': 'GEMINI_API_KEY',
                 'auto_generate_agents': True,
