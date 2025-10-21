@@ -81,7 +81,7 @@ agent:
     
     o4-mini:  # Add as many models as you want
       azure_deployment: "o4-mini"
-      azure_endpoint: "https://heycontext-openai.openai.azure.com"
+      azure_endpoint: "https://YOUR_AZURE_OPENAI_RESOURCE.openai.azure.com"
       api_key_env: "AZURE_API_KEY"
       api_version: "2025-01-01-preview"
 

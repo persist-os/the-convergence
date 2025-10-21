@@ -43,6 +43,16 @@ experiments_per_gen: 18 # 6 configs × 3 tests
 
 ## How to Run
 
+### Setup
+1. **Replace placeholders** in `azure_o4_mini_optimization.yaml`:
+   - Replace `YOUR_AZURE_OPENAI_RESOURCE` with your Azure OpenAI resource name
+   - Replace `YOUR_DEPLOYMENT_NAME` with your deployment name
+2. **Set environment variable**:
+   ```bash
+   export AZURE_API_KEY="your-api-key-here"
+   ```
+
+### Run Optimization
 ```bash
 convergence optimize examples/ai/azure/azure_o4_mini/azure_o4_mini_optimization.yaml
 ```

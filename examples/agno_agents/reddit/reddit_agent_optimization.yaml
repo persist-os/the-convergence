@@ -57,14 +57,14 @@ agent:
   models:
     gpt-4-1:
       azure_deployment: "gpt-4.1"
-      azure_endpoint: "https://heycontext-openai.cognitiveservices.azure.com"
+      azure_endpoint: "https://YOUR_AZURE_OPENAI_RESOURCE.cognitiveservices.azure.com"
       api_key_env: "AZURE_API_KEY"  # Can use same key or different: "AZURE_API_KEY_GPT4"
       api_version: "2024-12-01-preview"  # Required for o4-mini; also works for gpt-4.1
       description: "GPT-4.1 for high-quality responses"
     
     o4-mini:
       azure_deployment: "o4-mini"
-      azure_endpoint: "https://heycontext-openai.openai.azure.com"
+      azure_endpoint: "https://YOUR_AZURE_OPENAI_RESOURCE.openai.azure.com"
       api_key_env: "AZURE_API_KEY"
       api_version: "2024-12-01-preview"  # o4-mini requires 2024-12-01-preview or later
       description: "o4-mini model for fast, cost-effective testing"

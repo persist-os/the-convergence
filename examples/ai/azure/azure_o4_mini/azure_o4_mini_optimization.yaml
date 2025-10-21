@@ -1,10 +1,15 @@
 # Azure OpenAI o4-mini Optimization
 # Based on Azure AI Foundry format
+#
+# Replace placeholder values with your actual Azure credentials
+# - Replace YOUR_AZURE_OPENAI_RESOURCE with your Azure OpenAI resource name
+# - Replace YOUR_DEPLOYMENT_NAME with your deployment name
+# - Set AZURE_API_KEY environment variable with your API key
 
 api:
   name: "azure_o4_mini"
   description: "Azure OpenAI o4-mini (reasoning model)"
-  endpoint: "https://heycontext-openai.openai.azure.com/openai/deployments/o4-mini/chat/completions?api-version=2025-01-01-preview"
+  endpoint: "https://YOUR_AZURE_OPENAI_RESOURCE.openai.azure.com/openai/deployments/YOUR_DEPLOYMENT_NAME/chat/completions?api-version=2025-01-01-preview"
   
   request:
     method: "POST"
