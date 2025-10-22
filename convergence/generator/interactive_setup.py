@@ -2,13 +2,15 @@
 Interactive setup for Convergence when no OpenAPI spec is found.
 
 Provides:
-1. Fetch from URL
-2. Use preset template (OpenAI)
+1. AI-Powered Setup - Natural language interface
+2. Guided Setup - Step-by-step questions
+3. Preset Template - Working examples
+4. Custom Template - Proven patterns
 """
 from pathlib import Path
 from typing import Dict, Any
 from rich.console import Console
-from rich.prompt import Prompt
+from rich.prompt import Prompt, Confirm
 
 
 async def run_interactive_setup(project_dir: Path, output_dir: Path) -> Dict[str, Any]:
@@ -32,7 +34,36 @@ async def run_interactive_setup(project_dir: Path, output_dir: Path) -> Dict[str
     console.print("─" * 60)
     console.print("")
     
-    # Step 1: Choose template
+    # Step 1: Choose setup approach
+    console.print("[bold cyan]Choose your starting point:[/bold cyan]")
+    console.print("")
+    console.print("1. AI-Powered Setup - Describe what you want in natural language")
+    console.print("2. Guided Setup - Answer a few questions, we'll fill the rest")
+    console.print("3. Use Preset Template - Start from working examples")
+    console.print("4. Custom Template - Build from proven patterns")
+    console.print("")
+    
+    choice = Prompt.ask(
+        "Select approach",
+        choices=["1", "2", "3", "4"],
+        default="1"
+    )
+    
+    if choice == "1":
+        return await run_ai_powered_setup(project_dir, output_dir)
+    elif choice == "2":
+        return await run_guided_setup(project_dir, output_dir)
+    elif choice == "3":
+        return await run_preset_template_setup(project_dir, output_dir)
+    elif choice == "4":
+        return await run_custom_template_setup(project_dir, output_dir)
+
+
+async def run_preset_template_setup(project_dir: Path, output_dir: Path) -> Dict[str, Any]:
+    """Run preset template setup (existing functionality)."""
+    import os
+    console = Console()
+    
     console.print("[bold cyan]STEP 1: Choose Your API Template[/bold cyan]")
     console.print("")
     console.print("[dim]Select the API you want to optimize. Each template includes:[/dim]")
@@ -51,39 +82,13 @@ async def run_interactive_setup(project_dir: Path, output_dir: Path) -> Dict[str
             console.print(f"      [dim]Features: {', '.join(template['features'])}[/dim]")
         console.print("")
     
-    # Add custom option as last
-    custom_option = len(templates) + 1
-    console.print(f"  [cyan]{custom_option}.[/cyan] Custom (Generic Template)")
-    console.print(f"      Start from scratch with a minimal config")
-    console.print("")
-    
     choice = Prompt.ask(
         "Select template",
-        choices=[str(i) for i in range(1, custom_option + 1)],
+        choices=[str(i) for i in range(1, len(templates) + 1)],
         default="1"
     )
     
     choice_int = int(choice)
-    
-    # Handle custom template
-    if choice_int == custom_option:
-        console.print("")
-        console.print("📝 [bold]Custom Template[/bold]")
-        console.print("")
-        console.print("⚠️  Custom setup not yet implemented")
-        console.print("For now, please:")
-        console.print("  1. Check examples/ directory for reference configs")
-        console.print("  2. Copy and modify a similar example")
-        console.print("")
-        return {
-            'spec_path': 'custom',
-            'config_path': None,
-            'tests_path': None,
-            'test_cases': [],
-            'config': {},
-            'elapsed': 0.0
-        }
-    
     selected_template = templates[choice_int - 1]
     
     console.print("")
@@ -95,11 +100,173 @@ async def run_interactive_setup(project_dir: Path, output_dir: Path) -> Dict[str
     console.print("  ✅ Custom evaluator (if needed)")
     console.print("")
     
-    # Step 2: Configure key settings
+    # Step 2: Use sensible defaults for preset templates
     console.print("")
     console.print("─" * 60)
     console.print("")
-    console.print("[bold cyan]STEP 2: Configure Optimization[/bold cyan]")
+    console.print("[bold cyan]STEP 2: Using Preset Defaults[/bold cyan]")
+    console.print("")
+    console.print("[dim]Preset templates use proven default settings:[/dim]")
+    console.print("[dim]• Balanced optimization intensity (~18 API calls)[/dim]")
+    console.print("[dim]• Optimized for quality, speed, and cost balance[/dim]")
+    console.print("[dim]• Legacy system enabled for continuous learning[/dim]")
+    console.print("")
+    
+    # Use sensible defaults instead of asking detailed questions
+    config_overrides = _get_preset_defaults(selected_template)
+    
+    # Step 3: Agent Society (Use defaults for presets)
+    console.print("")
+    console.print("─" * 60)
+    console.print("")
+    console.print("[bold cyan]STEP 3: Agent Society Configuration[/bold cyan]")
+    console.print("")
+    console.print("[dim]Using default agent society settings:[/dim]")
+    console.print("[dim]• Enabled with Gemini for coordination[/dim]")
+    console.print("[dim]• RLP and SAO enabled for advanced learning[/dim]")
+    console.print("")
+    
+    # Use default agent society configuration
+    society_config = _get_default_society_config()
+    
+    # Step 4: Create the template
+    from .preset_templates import create_preset_config
+    return await create_preset_config(
+        selected_template['id'], 
+        project_dir, 
+        output_dir,
+        society_config,
+        config_overrides
+    )
+
+
+async def run_guided_setup(project_dir: Path, output_dir: Path) -> Dict[str, Any]:
+    """Run guided setup with comprehensive step-by-step questions."""
+    import os
+    console = Console()
+    
+    console.print("\n🎯 [bold cyan]Guided Setup - Customize Your Configuration[/bold cyan]")
+    console.print("")
+    console.print("[dim]This setup will ask detailed questions to create a customized template.[/dim]")
+    console.print("")
+    
+    # Step 1: Choose API type
+    console.print("[bold cyan]STEP 1: Choose Your API Type[/bold cyan]")
+    console.print("")
+    console.print("What type of API are you optimizing?")
+    console.print("1. LLM Chat API (OpenAI-style responses)")
+    console.print("2. Agent API (LLM with tools/functions)")
+    console.print("3. Web Automation (browser control)")
+    console.print("")
+    
+    api_choice = Prompt.ask("Select API type", choices=["1", "2", "3"], default="1")
+    
+    # Map API choice to template type
+    template_mapping = {
+        "1": "llm_chat",
+        "2": "agno_agent", 
+        "3": "web_automation"
+    }
+    
+    template_type = template_mapping[api_choice]
+    
+    console.print("")
+    console.print("─" * 60)
+    console.print("")
+    
+    # Step 2: API Configuration
+    console.print("[bold cyan]STEP 2: API Configuration[/bold cyan]")
+    console.print("")
+    
+    # Provider selection for LLM Chat APIs
+    if template_type == "llm_chat":
+        console.print("Select your LLM provider:")
+        console.print("1. OpenAI (ChatGPT, GPT-4, etc.)")
+        console.print("2. Groq (Llama models, ultra-fast)")
+        console.print("3. Azure OpenAI (Enterprise OpenAI)")
+        console.print("4. Anthropic (Claude)")
+        console.print("5. Custom/Other")
+        console.print("")
+        
+        provider_choice = Prompt.ask("Select provider", choices=["1", "2", "3", "4", "5"], default="1")
+        
+        # Map choice to provider details
+        provider_configs = {
+            "1": {"name": "openai", "endpoint": "https://api.openai.com/v1/chat/completions", "api_key": "OPENAI_API_KEY", "default_models": "gpt-4o-mini, gpt-3.5-turbo"},
+            "2": {"name": "groq", "endpoint": "https://api.groq.com/openai/v1/chat/completions", "api_key": "GROQ_API_KEY", "default_models": "llama-3.3-70b-versatile, llama-3.1-8b-instant"},
+            "3": {"name": "azure", "endpoint": "https://your-resource.openai.azure.com/openai/deployments/your-model/chat/completions", "api_key": "AZURE_OPENAI_API_KEY", "default_models": "gpt-4o, gpt-4o-mini"},
+            "4": {"name": "anthropic", "endpoint": "https://api.anthropic.com/v1/messages", "api_key": "ANTHROPIC_API_KEY", "default_models": "claude-3-haiku, claude-3-sonnet"},
+            "5": {"name": "custom", "endpoint": "https://api.example.com/v1/chat/completions", "api_key": "API_KEY", "default_models": "model1, model2"}
+        }
+        
+        selected_provider = provider_configs[provider_choice]
+        provider_name = selected_provider["name"]
+        default_endpoint = selected_provider["endpoint"]
+        default_api_key = selected_provider["api_key"]
+        default_models = selected_provider["default_models"]
+        
+        console.print(f"\n[green]✅ Selected: {provider_name.title()}[/green]")
+        console.print("")
+        
+        # Endpoint configuration
+        console.print("API Endpoint:")
+        console.print(f"[dim]Default: {default_endpoint}[/dim]")
+        console.print("[dim]You can customize this or skip to use the default.[/dim]")
+        console.print("")
+        
+        endpoint = Prompt.ask("API endpoint (or press Enter for default)", default=default_endpoint)
+        
+        # API key environment variable
+        console.print("")
+        console.print(f"[bold yellow]⚠️  Enter the ENVIRONMENT VARIABLE NAME (e.g., {default_api_key})[/bold yellow]")
+        console.print("[dim]NOT the actual API key value! You'll need to export it in your terminal.[/dim]")
+        console.print("")
+        api_key_env = Prompt.ask("API key env var name", default=default_api_key)
+        
+        # Model specification
+        console.print("")
+        console.print("Model Names:")
+        console.print(f"[dim]Default: {default_models}[/dim]")
+        console.print("[dim]Enter model names separated by commas (you can add more later in the YAML).[/dim]")
+        console.print("")
+        models_input = Prompt.ask("Model names (comma-separated)", default=default_models)
+        models = [model.strip() for model in models_input.split(",")]
+        
+    else:
+        # Non-LLM Chat APIs use original logic
+        if template_type == "agno_agent":
+            endpoint = "https://api.example.com/v1/agent"
+            default_api_key = "AGNO_API_KEY"
+        elif template_type == "web_automation":
+            endpoint = "https://api.browserbase.com/v1/sessions"
+            default_api_key = "BROWSERBASE_API_KEY"
+        else:
+            endpoint = "https://api.example.com/v1/endpoint"
+            default_api_key = "API_KEY"
+        
+        console.print(f"[dim]Using default endpoint: {endpoint}[/dim]")
+        console.print("[dim]This can be changed in optimization.yaml if needed.[/dim]")
+        console.print("")
+        
+        # API key environment variable
+        console.print(f"[bold yellow]⚠️  Enter the ENVIRONMENT VARIABLE NAME (e.g., {default_api_key})[/bold yellow]")
+        console.print("[dim]NOT the actual API key value! You'll need to export it in your terminal.[/dim]")
+        console.print("")
+        api_key_env = Prompt.ask("API key env var name", default=default_api_key)
+        
+        # For non-LLM APIs, use default models
+        provider_name = template_type
+        models = ["default_model"]
+    
+    # Use consistent description for test case generation
+    description = "API optimization"
+    
+    console.print("")
+    console.print("─" * 60)
+    console.print("")
+    
+    # Step 3: Detailed Configuration (like preset setup)
+    console.print("[bold cyan]STEP 3: Optimization Configuration[/bold cyan]")
     console.print("")
     console.print("[dim]Customize how the optimization runs. These settings control:[/dim]")
     console.print("[dim]• How many API calls to make[/dim]")
@@ -107,30 +274,25 @@ async def run_interactive_setup(project_dir: Path, output_dir: Path) -> Dict[str
     console.print("[dim]• Where to save results[/dim]")
     console.print("")
     
-    config_overrides = await _gather_config_preferences(console, selected_template)
+    # Create a mock template dict for the configuration gathering
+    mock_template = {'id': template_type}
+    config_overrides = await _gather_config_preferences(console, mock_template, skip_api_key=True)
     
-    # Step 3: Agent Society (Experimental)
+    # Add the API key env var that we already asked for
+    config_overrides['api_key_env'] = api_key_env
+    
     console.print("")
     console.print("─" * 60)
     console.print("")
-    console.print("[bold yellow]STEP 3: Agent Society (EXPERIMENTAL - Optional)[/bold yellow]")
+    
+    # Step 4: Agent Society Configuration
+    console.print("[bold cyan]STEP 4: Agent Society Configuration[/bold cyan]")
     console.print("")
-    console.print("[yellow]⚠️  This feature is experimental and under active development.[/yellow]")
-    console.print("[yellow]   Most users should skip this for initial setup.[/yellow]")
-    console.print("")
-    console.print("[dim]What is Agent Society?[/dim]")
-    console.print("[dim]AI agents that learn from each run to find better configurations.[/dim]")
-    console.print("")
-    console.print("[dim]Includes:[/dim]")
-    console.print("  • [dim]RLP: Reasoning-based Learning Process[/dim]")
-    console.print("  • [dim]SAO: Self-Alignment Optimization[/dim]")
-    console.print("  • [dim]Auto-generated agents tailored to your API[/dim]")
-    console.print("")
-    console.print("[dim]Note: Multi-agent collaboration coming in future version[/dim]")
+    console.print("[dim]Agent Society enables advanced AI-powered optimization.[/dim]")
     console.print("")
     
     enable_society = Prompt.ask(
-        "Enable agent society? (experimental)",
+        "Enable agent society? (requires LiteLLM setup)",
         choices=["y", "n"],
         default="n"
     ) == "y"
@@ -173,62 +335,74 @@ async def run_interactive_setup(project_dir: Path, output_dir: Path) -> Dict[str
             default=default_key_env
         )
         
-        # Validate that they didn't paste an actual API key
-        if _looks_like_api_key(key_env):
-            console.print("")
-            console.print(f"[bold red]❌ ERROR: You entered what looks like an actual API key![/bold red]")
-            console.print(f"[yellow]Please enter the ENVIRONMENT VARIABLE NAME, not the key itself.[/yellow]")
-            console.print(f"[dim]Example: {default_key_env}[/dim]")
-            console.print("")
-            key_env = Prompt.ask(
-                "Environment variable name",
-                default=default_key_env
-            )
-        
-        # Check if key is set
-        if not os.getenv(key_env):
-            console.print("")
-            console.print(f"[yellow]⚠️  {key_env} not set[/yellow]")
-            console.print("")
-            provide_key = Prompt.ask(
-                "Provide API key now?",
-                choices=["y", "n"],
-                default="n"
-            ) == "y"
-            
-            if provide_key:
-                from rich.prompt import Prompt as SecurePrompt
-                api_key = SecurePrompt.ask(
-                    "Enter API key",
-                    password=True
-                )
-                os.environ[key_env] = api_key
-                console.print(f"✅ {key_env} set for this session")
-                console.print("")
-                console.print(f"💡 To persist: export {key_env}='{api_key}'")
-        else:
-            console.print(f"✅ {key_env} already set")
-        
-        console.print("")
-        
         society_config = {
             "enabled": True,
             "model": model,
-            "api_key_env": key_env
+            "api_key_env": key_env,
+            "auto_generate_agents": True,
+            "rlp_enabled": True,
+            "sao_enabled": True
         }
     
-    # Step 4: Create the template
-    from .preset_templates import create_preset_config
-    return await create_preset_config(
-        selected_template['id'], 
-        project_dir, 
-        output_dir,
-        society_config,
-        config_overrides
-    )
+    console.print("")
+    console.print("─" * 60)
+    console.print("")
+    
+    # Step 5: Generate Template
+    console.print("[bold cyan]STEP 5: Generating Custom Template[/bold cyan]")
+    console.print("")
+    
+    # Use the custom template generator with the selected type
+    from .custom_template_generator import CustomTemplateGenerator
+    generator = CustomTemplateGenerator()
+    
+    # Generate template using the selected type
+    template = generator.templates[template_type]
+    
+    config = template.generate_config(endpoint, api_key_env, description, provider_name, models)
+    test_cases = template.generate_test_cases(description)
+    evaluator_code = template.generate_evaluator()
+    
+    # Apply configuration overrides to the generated config
+    config = _apply_config_overrides(config, config_overrides, society_config)
+    
+    # Show what we're generating
+    console.print("")
+    console.print(f"📋 [bold]Generating {template_type.replace('_', ' ').title()} Template[/bold]")
+    console.print("")
+    console.print("Files to be created:")
+    console.print("  • optimization.yaml - Main configuration")
+    console.print("  • test_cases.json - Test cases for your API")
+    console.print("  • evaluator.py - Custom scoring logic")
+    console.print("  • README.md - Setup instructions")
+    console.print("")
+    console.print(f"API key env var: {api_key_env}")
+    console.print(f"Description: {description}")
+    console.print("")
+    
+    if Confirm.ask("Create these files?"):
+        return await generator._save_template_files(config, test_cases, evaluator_code, output_dir, template_type, provider_name)
+    else:
+        console.print("Setup cancelled.")
+        return {
+            'spec_path': 'cancelled',
+            'config_path': None,
+            'tests_path': None,
+            'test_cases': [],
+            'config': {},
+            'elapsed': 0.0
+        }
 
 
-async def _gather_config_preferences(console: Console, template: Dict[str, Any]) -> Dict[str, Any]:
+async def run_custom_template_setup(project_dir: Path, output_dir: Path) -> Dict[str, Any]:
+    """Run custom template setup using proven patterns."""
+    from .custom_template_generator import CustomTemplateGenerator
+    
+    generator = CustomTemplateGenerator()
+    return await generator.generate_custom_template(project_dir, output_dir)
+
+
+async def _gather_config_preferences(console: Console, template: Dict[str, Any], skip_api_key: bool = False) -> Dict[str, Any]:
     """
     Gather user preferences for key configuration options.
     
@@ -237,65 +411,66 @@ async def _gather_config_preferences(console: Console, template: Dict[str, Any])
     import os
     overrides = {}
     
-    # 1. API Key
-    console.print("┌─ [bold cyan]API Authentication[/bold cyan] " + "─" * 38 + "┐")
-    console.print("│")
-    
-    # Suggest API key env var based on template
-    if template['id'] == 'openai':
-        default_key_env = "OPENAI_API_KEY"
-        console.print("│ [dim]Your API calls will be authenticated using an environment[/dim]")
-        console.print("│ [dim]variable. Get your key from: platform.openai.com/api-keys[/dim]")
-    elif template['id'] == 'browserbase':
-        default_key_env = "BROWSERBASE_API_KEY"
-        console.print("│ [dim]BrowserBase requires an API key.[/dim]")
-        console.print("│ [dim]Get yours from: browserbase.com[/dim]")
-    elif template['id'] == 'groq':
-        default_key_env = "GROQ_API_KEY"
-        console.print("│ [dim]Groq provides fast inference.[/dim]")
-        console.print("│ [dim]Get your key from: console.groq.com[/dim]")
-    elif template['id'] == 'azure':
-        default_key_env = "AZURE_OPENAI_API_KEY"
-        console.print("│ [dim]Azure-hosted OpenAI models.[/dim]")
-        console.print("│ [dim]Get your key from: portal.azure.com[/dim]")
-    else:
-        default_key_env = "API_KEY"
-    
-    console.print("│")
-    console.print("│ [bold yellow]⚠️  Enter the ENVIRONMENT VARIABLE NAME[/bold yellow]")
-    console.print(f"│ [bold yellow]    (e.g., {default_key_env}) - NOT the actual key![/bold yellow]")
-    console.print("│")
-    console.print("└" + "─" * 59 + "┘")
-    console.print("")
-    
-    key_env = Prompt.ask(
-        "Environment variable name",
-        default=default_key_env
-    )
-    
-    # Validate that they didn't paste an actual API key
-    if _looks_like_api_key(key_env):
+    # 1. API Key (skip if already asked)
+    if not skip_api_key:
+        console.print("┌─ [bold cyan]API Authentication[/bold cyan] " + "─" * 38 + "┐")
+        console.print("│")
+        
+        # Suggest API key env var based on template
+        if template['id'] == 'openai':
+            default_key_env = "API_KEY"
+            console.print("│ [dim]Your API calls will be authenticated using an environment[/dim]")
+            console.print("│ [dim]variable. Get your key from: platform.openai.com/api-keys[/dim]")
+        elif template['id'] == 'browserbase':
+            default_key_env = "BROWSERBASE_API_KEY"
+            console.print("│ [dim]BrowserBase requires an API key.[/dim]")
+            console.print("│ [dim]Get yours from: browserbase.com[/dim]")
+        elif template['id'] == 'groq':
+            default_key_env = "GROQ_API_KEY"
+            console.print("│ [dim]Groq provides fast inference.[/dim]")
+            console.print("│ [dim]Get your key from: console.groq.com[/dim]")
+        elif template['id'] == 'azure':
+            default_key_env = "AZURE_OPENAI_API_KEY"
+            console.print("│ [dim]Azure-hosted OpenAI models.[/dim]")
+            console.print("│ [dim]Get your key from: portal.azure.com[/dim]")
+        else:
+            default_key_env = "API_KEY"
+        
+        console.print("│")
+        console.print("│ [bold yellow]⚠️  Enter the ENVIRONMENT VARIABLE NAME[/bold yellow]")
+        console.print(f"│ [bold yellow]    (e.g., {default_key_env}) - NOT the actual key![/bold yellow]")
+        console.print("│")
+        console.print("└" + "─" * 59 + "┘")
         console.print("")
-        console.print(f"[bold red]❌ ERROR: You entered what looks like an actual API key![/bold red]")
-        console.print(f"[yellow]   Please enter the ENVIRONMENT VARIABLE NAME, not the key value.[/yellow]")
-        console.print(f"[dim]   Example: {default_key_env}[/dim]")
-        console.print("")
+        
         key_env = Prompt.ask(
             "Environment variable name",
             default=default_key_env
         )
-    
-    # Check if set
-    if not os.getenv(key_env):
-        console.print(f"[yellow]⚠️  {key_env} is not currently set in your environment[/yellow]")
-        console.print(f"[dim]   Before running optimization, set it with:[/dim]")
-        console.print(f"[cyan]   export {key_env}='your-actual-key-here'[/cyan]")
-    else:
-        console.print(f"[green]✅ {key_env} is already set and ready to use[/green]")
-    
-    overrides['api_key_env'] = key_env
-    console.print("")
-    console.print("")
+        
+        # Validate that they didn't paste an actual API key
+        if _looks_like_api_key(key_env):
+            console.print("")
+            console.print(f"[bold red]❌ ERROR: You entered what looks like an actual API key![/bold red]")
+            console.print(f"[yellow]   Please enter the ENVIRONMENT VARIABLE NAME, not the key value.[/yellow]")
+            console.print(f"[dim]   Example: {default_key_env}[/dim]")
+            console.print("")
+            key_env = Prompt.ask(
+                "Environment variable name",
+                default=default_key_env
+            )
+        
+        # Check if set
+        if not os.getenv(key_env):
+            console.print(f"[yellow]⚠️  {key_env} is not currently set in your environment[/yellow]")
+            console.print(f"[dim]   Before running optimization, set it with:[/dim]")
+            console.print(f"[cyan]   export {key_env}='your-actual-key-here'[/cyan]")
+        else:
+            console.print(f"[green]✅ {key_env} is already set and ready to use[/green]")
+        
+        overrides['api_key_env'] = key_env
+        console.print("")
+        console.print("")
     
     # 2. Optimization intensity
     console.print("┌─ [bold cyan]Optimization Intensity[/bold cyan] " + "─" * 35 + "┐")
@@ -493,3 +668,119 @@ def _looks_like_api_key(value: str) -> bool:
         return True
     
     return False
+
+
+def _get_preset_defaults(template: Dict[str, Any]) -> Dict[str, Any]:
+    """Get sensible defaults for preset templates."""
+    # Get default API key env var based on template
+    template_key_map = {
+        'openai': 'API_KEY',
+        'browserbase': 'BROWSERBASE_API_KEY', 
+        'groq': 'GROQ_API_KEY',
+        'azure': 'AZURE_OPENAI_API_KEY'
+    }
+    
+    default_key_env = template_key_map.get(template['id'], 'API_KEY')
+    
+    return {
+        'api_key_env': default_key_env,
+        'intensity': 'balanced',
+        'parallel_workers': 1,
+        'output_path': f'./results/{template["id"]}_optimization',
+        'optimization_goal': 'balanced',
+        'legacy_enabled': True
+    }
+
+
+def _get_default_society_config() -> Dict[str, Any]:
+    """Get default agent society configuration."""
+    return {
+        'enabled': False,
+        'model': 'gemini/gemini-2.0-flash-exp',
+        'api_key_env': 'GEMINI_API_KEY',
+        'auto_generate_agents': True,
+        'rlp_enabled': True,
+        'sao_enabled': True
+    }
+
+
+def _apply_config_overrides(config: Dict[str, Any], overrides: Dict[str, Any], society_config: Dict[str, Any]) -> Dict[str, Any]:
+    """Apply configuration overrides to the generated config."""
+    # Apply API key environment variable
+    if 'api_key_env' in overrides:
+        config['api']['auth']['token_env'] = overrides['api_key_env']
+    
+    # Apply optimization settings
+    if 'intensity' in overrides:
+        intensity_map = {
+            "quick": {
+                "experiments_per_generation": 2,
+                "population_size": 2,
+                "generations": 2,
+                "parallel_workers": 1
+            },
+            "balanced": {
+                "experiments_per_generation": 2,
+                "population_size": 3,
+                "generations": 2,
+                "parallel_workers": 1
+            },
+            "thorough": {
+                "experiments_per_generation": 4,
+                "population_size": 4,
+                "generations": 3,
+                "parallel_workers": 2
+            }
+        }
+        
+        intensity_settings = intensity_map.get(overrides['intensity'], intensity_map['balanced'])
+        
+        # Apply to optimization section
+        if 'optimization' not in config:
+            config['optimization'] = {}
+        if 'evolution' not in config['optimization']:
+            config['optimization']['evolution'] = {}
+        if 'execution' not in config['optimization']:
+            config['optimization']['execution'] = {}
+        
+        config['optimization']['evolution'].update({
+            'population_size': intensity_settings['population_size'],
+            'generations': intensity_settings['generations']
+        })
+        config['optimization']['execution'].update({
+            'experiments_per_generation': intensity_settings['experiments_per_generation'],
+            'parallel_workers': intensity_settings['parallel_workers']
+        })
+    
+    # Apply output path
+    if 'output_path' in overrides:
+        if 'output' not in config:
+            config['output'] = {}
+        config['output']['save_path'] = overrides['output_path']
+    
+    # Apply agent society configuration
+    if society_config:
+        config['society'] = society_config
+    
+    # Apply legacy settings
+    if 'legacy_enabled' in overrides:
+        if 'legacy' not in config:
+            config['legacy'] = {}
+        config['legacy']['enabled'] = overrides['legacy_enabled']
+        if overrides['legacy_enabled']:
+            config['legacy'].update({
+                'session_id': f"{config['api']['name']}_optimization",
+                'tracking_backend': 'builtin',
+                'sqlite_path': './data/legacy.db',
+                'export_dir': './legacy_exports',
+                'export_formats': ['csv', 'json']
+            })
+    
+    return config
+
+
+# Import AI-powered setup function
+async def run_ai_powered_setup(project_dir: Path, output_dir: Path) -> Dict[str, Any]:
+    """Import and run AI-powered setup."""
+    from .ai_powered_setup import run_ai_powered_setup as _run_ai_powered_setup
+    return await _run_ai_powered_setup(project_dir, output_dir)

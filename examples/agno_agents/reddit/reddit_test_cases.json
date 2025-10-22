@@ -1,0 +1,304 @@
+{
+  "test_cases": [
+    {
+      "id": "subreddit_research_workflow",
+      "function": "multiple",
+      "description": "Research workflow: Get subreddit info + top posts to understand community",
+      "input": {
+        "query": "Research the r/MachineLearning subreddit - get its details and see what topics are popular",
+        "task": "Analyze r/MachineLearning by getting subreddit information and examining top posts"
+      },
+      "expected": {
+        "tools_called": ["get_subreddit_info", "get_top_posts"],
+        "tool_sequence": [
+          {
+            "tool": "get_subreddit_info",
+            "params": {
+              "subreddit_name": "MachineLearning"
+            }
+          },
+          {
+            "tool": "get_top_posts",
+            "params": {
+              "subreddit": "MachineLearning",
+              "time_filter": "week",
+              "limit": 5
+            }
+          }
+        ],
+        "result_validation": {
+          "schema": {
+            "type": "object",
+            "required_fields": ["subreddit_info", "top_posts"]
+          },
+          "data_checks": {
+            "has_subreddit_info": true,
+            "has_top_posts": true,
+            "subreddit_matches": "MachineLearning",
+            "posts_from_correct_subreddit": true
+          },
+          "keywords": {
+            "required_in_final_response": ["MachineLearning", "subreddit", "posts", "subscribers"],
+            "match_type": "case_insensitive",
+            "min_matches": 3
+          }
+        },
+        "success_criteria": {
+          "tools_called_correctly": true,
+          "tool_sequence_logical": true,
+          "valid_response_format": true,
+          "data_completeness_percent": 85,
+          "comprehensive_analysis": true
+        }
+      },
+      "metadata": {
+        "category": "integration_test",
+        "difficulty": "medium",
+        "subreddit_focus": "r/MachineLearning",
+        "estimated_tokens": 600,
+        "weight": 1.5,
+        "tool_restriction": "all_tools_available",
+        "note": "Agent must choose appropriate tools for research workflow"
+      }
+    },
+    
+    {
+      "id": "ai_content_discovery_workflow",
+      "function": "multiple",
+      "description": "Content discovery: Find trending subreddits + analyze AI-related posts",
+      "input": {
+        "query": "Find trending subreddits and look for AI-related content in technology communities",
+        "task": "Discover trending communities and analyze AI content in tech subreddits"
+      },
+      "expected": {
+        "tools_called": ["get_trending_subreddits", "get_top_posts"],
+        "tool_sequence": [
+          {
+            "tool": "get_trending_subreddits",
+            "params": {}
+          },
+          {
+            "tool": "get_top_posts",
+            "params": {
+              "subreddit": "technology",
+              "time_filter": "day",
+              "limit": 3
+            }
+          }
+        ],
+        "result_validation": {
+          "schema": {
+            "type": "object",
+            "required_fields": ["trending_subreddits", "tech_posts"]
+          },
+          "data_checks": {
+            "found_trending_subreddits": true,
+            "found_tech_posts": true,
+            "posts_from_technology": true
+          },
+          "keywords": {
+            "required_in_final_response": ["trending", "technology", "AI", "posts"],
+            "match_type": "case_insensitive",
+            "min_matches": 2
+          }
+        },
+        "success_criteria": {
+          "tools_called_correctly": true,
+          "tool_sequence_logical": true,
+          "valid_response_format": true,
+          "data_completeness_percent": 80,
+          "content_discovery_successful": true
+        }
+      },
+      "metadata": {
+        "category": "integration_test",
+        "difficulty": "medium",
+        "subreddit_focus": "multiple",
+        "estimated_tokens": 500,
+        "weight": 1.3,
+        "tool_restriction": "all_tools_available",
+        "note": "Agent must discover content across multiple subreddits"
+      }
+    },
+    
+    {
+      "id": "community_analysis_workflow",
+      "function": "multiple",
+      "description": "Community analysis: Compare subreddit stats and activity",
+      "input": {
+        "query": "Compare r/artificial and r/technology - analyze their communities and recent activity",
+        "task": "Analyze and compare two AI/tech communities by getting their stats and recent posts"
+      },
+      "expected": {
+        "tools_called": ["get_subreddit_stats", "get_subreddit_info", "get_top_posts"],
+        "tool_sequence": [
+          {
+            "tool": "get_subreddit_stats",
+            "params": {
+              "subreddit": "artificial"
+            }
+          },
+          {
+            "tool": "get_subreddit_stats",
+            "params": {
+              "subreddit": "technology"
+            }
+          },
+          {
+            "tool": "get_top_posts",
+            "params": {
+              "subreddit": "artificial",
+              "time_filter": "week",
+              "limit": 3
+            }
+          }
+        ],
+        "result_validation": {
+          "schema": {
+            "type": "object",
+            "required_fields": ["artificial_stats", "technology_stats", "artificial_posts"]
+          },
+          "data_checks": {
+            "has_artificial_stats": true,
+            "has_technology_stats": true,
+            "has_artificial_posts": true,
+            "comparison_data_present": true
+          },
+          "keywords": {
+            "required_in_final_response": ["artificial", "technology", "subscribers", "comparison"],
+            "match_type": "case_insensitive",
+            "min_matches": 3
+          }
+        },
+        "success_criteria": {
+          "tools_called_correctly": true,
+          "tool_sequence_logical": true,
+          "valid_response_format": true,
+          "data_completeness_percent": 85,
+          "comparative_analysis_complete": true
+        }
+      },
+      "metadata": {
+        "category": "integration_test",
+        "difficulty": "hard",
+        "subreddit_focus": "r/artificial, r/technology",
+        "estimated_tokens": 700,
+        "weight": 2.0,
+        "tool_restriction": "all_tools_available",
+        "note": "Complex multi-subreddit analysis workflow"
+      }
+    },
+    
+    {
+      "id": "single_tool_subreddit_info",
+      "function": "get_subreddit_info",
+      "description": "Unit test: Get detailed information about a specific subreddit",
+      "input": {
+        "query": "Get detailed information about r/DeepLearning",
+        "task": "Retrieve comprehensive information about the r/DeepLearning subreddit"
+      },
+      "expected": {
+        "tool_called": "get_subreddit_info",
+        "tool_params": {
+          "subreddit_name": "DeepLearning"
+        },
+        "result_validation": {
+          "schema": {
+            "type": "object",
+            "required_fields": [
+              "display_name",
+              "title",
+              "public_description",
+              "subscribers",
+              "created_utc",
+              "url"
+            ]
+          },
+          "data_checks": {
+            "display_name_matches": "DeepLearning",
+            "has_public_description": true,
+            "has_title": true,
+            "subscriber_count_reasonable": {
+              "min": 1000,
+              "message": "DeepLearning should have substantial subscribers"
+            }
+          },
+          "keywords": {
+            "required_in_description": ["deep", "learning", "neural", "AI", "machine"],
+            "match_type": "case_insensitive",
+            "min_matches": 1
+          }
+        },
+        "success_criteria": {
+          "tool_called_correctly": true,
+          "valid_response_format": true,
+          "data_completeness_percent": 90,
+          "subreddit_info_accurate": true
+        }
+      },
+      "metadata": {
+        "category": "unit_test",
+        "difficulty": "easy",
+        "subreddit_focus": "r/DeepLearning",
+        "estimated_tokens": 300,
+        "weight": 1.0,
+        "tool_restriction": "get_subreddit_info_only"
+      }
+    }
+  ],
+  
+  "metadata": {
+    "version": "3.0",
+    "total_tests": 4,
+    "unit_tests": 1,
+    "integration_tests": 3,
+    "difficulty_distribution": {
+      "easy": 1,
+      "medium": 2,
+      "hard": 1
+    },
+    "subreddit_coverage": {
+      "r/MachineLearning": 1,
+      "r/technology": 2,
+      "r/artificial": 1,
+      "r/DeepLearning": 1,
+      "multiple": 1
+    },
+    "tools_tested": {
+      "get_subreddit_info": 3,
+      "get_top_posts": 3,
+      "get_trending_subreddits": 1,
+      "get_subreddit_stats": 1
+    },
+    "tool_restrictions": {
+      "specific_tool_only": 1,
+      "all_tools_available": 3
+    },
+    "workflow_types": {
+      "research_workflow": 1,
+      "content_discovery": 1,
+      "community_analysis": 1,
+      "single_tool_test": 1
+    },
+    "validation_features": {
+      "schema_validation": true,
+      "data_completeness": true,
+      "keyword_matching": true,
+      "numeric_thresholds": true,
+      "multi_tool_workflows": true,
+      "tool_selection_autonomy": true,
+      "workflow_sequence_validation": true,
+      "comparative_analysis": true
+    },
+    "notes": [
+      "Test 1: Research workflow - combines subreddit info + top posts for community analysis",
+      "Test 2: Content discovery - finds trending subreddits + analyzes tech posts",
+      "Test 3: Community analysis - compares multiple subreddits using stats and posts",
+      "Test 4: Unit test - single tool validation for get_subreddit_info",
+      "All tests use actual RedditTools functions that exist in the package",
+      "Focus on realistic workflows that mirror real-world use cases",
+      "Tests agent's ability to choose appropriate tools and sequence them logically"
+    ]
+  }
+}
+

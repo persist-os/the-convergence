@@ -8,6 +8,7 @@ import importlib
 import importlib.util
 import json
 import sys
+import time
 from pathlib import Path
 from difflib import SequenceMatcher
 
@@ -323,12 +324,34 @@ class Evaluator:
         # Use Weave-tracked version if available
         if WEAVE_AVAILABLE and weave:
             @weave.op()
-            async def tracked_evaluation():
+            async def tracked_evaluation(
+                response: APIResponse,
+                test_case: Dict[str, Any],
+                config_params: Dict[str, Any]
+            ):
+                # Add evaluation context for better trace visibility
+                evaluation_context = {
+                    "test_case_id": test_case.get("id", "unknown"),
+                    "test_case_description": test_case.get("description", ""),
+                    "config_params": config_params,
+                    "response_success": response.success,
+                    "response_latency_ms": response.latency_ms,
+                    "response_cost_usd": response.estimated_cost_usd
+                }
+                
                 metric_scores = await self.evaluate(response, test_case, config_params)
                 aggregate = self.aggregate_scores(metric_scores)
+                
+                # Add evaluation results to context
+                evaluation_context.update({
+                    "metric_scores": metric_scores,
+                    "aggregate_score": aggregate,
+                    "evaluation_timestamp": time.time()
+                })
+                
                 return metric_scores, aggregate
             
-            return await tracked_evaluation()
+            return await tracked_evaluation(response, test_case, config_params)
         else:
             metric_scores = await self.evaluate(response, test_case, config_params)
             aggregate = self.aggregate_scores(metric_scores)

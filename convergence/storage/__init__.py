@@ -43,6 +43,14 @@ from convergence.storage.rl_models import (
     RLAction,
 )
 
+# Optional Convex storage (requires backend environment)
+try:
+    from convergence.storage.convex import ConvexStorage
+    _CONVEX_AVAILABLE = True
+except ImportError:
+    _CONVEX_AVAILABLE = False
+    ConvexStorage = None
+
 __all__ = [
     # Protocol and base classes
     "StorageProtocol",
@@ -64,6 +72,9 @@ __all__ = [
     # Multi-backend (CRITICAL for legacy)
     "MultiBackendStorage",
     "get_legacy_storage",
+    
+    # Convex backend (optional, requires backend)
+    "ConvexStorage",
     
     # Legacy management
     "LegacyManager",

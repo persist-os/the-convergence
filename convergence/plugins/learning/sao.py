@@ -715,6 +715,29 @@ Judgment:"""
         print(f"Successfully generated {len(dataset)} preference pairs!")
         
         return dataset
+    
+    def get_generation_stats(self) -> Dict[str, Any]:
+        """Get current SAO generation statistics."""
+        return {
+            'dataset_size': len(self.synthetic_dataset),
+            'unique_prompts': len(self.seen_prompts),
+            'diversity_score': self._calculate_diversity_score(),
+            'quality_filtered': self.generation_stats['filtered_quality'],
+            'duplicates_filtered': self.generation_stats['filtered_duplicates'],
+            'rounds_completed': self.generation_stats['rounds_completed'],
+            'total_generated': self.generation_stats['total_generated']
+        }
+    
+    def _calculate_diversity_score(self) -> float:
+        """Calculate diversity score based on prompt embeddings."""
+        if len(self.prompt_embeddings) < 2:
+            return 1.0
+        
+        # Simple diversity metric based on embedding variance
+        import numpy as np
+        embeddings = np.array(self.prompt_embeddings)
+        variance = np.var(embeddings, axis=0).mean()
+        return min(1.0, variance * 10)  # Scale to 0-1
 
 
 class SAOGeneratorPlugin:

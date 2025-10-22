@@ -18,6 +18,7 @@ from .models import OptimizationSchema, APIResponse, OptimizationResult
 from .config_loader import ConfigLoader
 from .api_caller import APICaller
 from .evaluator import Evaluator
+from .config_validator import ConfigValidator
 from .evolution import EvolutionEngine, ConfigurationAnalyzer
 from .test_case_evolution import TestCaseEvolutionEngine, TestCaseAnalyzer
 from .rl_optimizer import RLMetaOptimizer
@@ -37,6 +38,7 @@ try:
     from .adapters.azure import AzureOpenAIAdapter
     from .adapters.gemini import GeminiAdapter
     from .adapters.browserbase import BrowserBaseAdapter
+    from .adapters.agno_reddit import AgnoRedditAdapter
     ADAPTERS_AVAILABLE = True
 except ImportError:
     ADAPTERS_AVAILABLE = False
@@ -44,6 +46,7 @@ except ImportError:
     AzureOpenAIAdapter = None
     GeminiAdapter = None
     BrowserBaseAdapter = None
+    AgnoRedditAdapter = None
 
 # Weave integration for observability
 try:
@@ -77,6 +80,17 @@ class OptimizationRunner:
         self.config = config
         self.config_file_path = config_file_path
         
+        # Validate configuration early
+        try:
+            ConfigValidator.validate_and_suggest_fixes(
+                config.dict(), 
+                str(config_file_path) if config_file_path else None
+            )
+        except Exception as e:
+            console.print(f"[red]❌ Configuration validation failed:[/red]")
+            console.print(f"[red]{e}[/red]")
+            raise
+        
         # Initialize components
         self.api_caller = APICaller(timeout=config.api.request.timeout_seconds)
         self.evaluator = Evaluator(config.evaluation, config_file_path=config_file_path)
@@ -84,7 +98,7 @@ class OptimizationRunner:
         # Initialize API adapter based on provider
         # OpenAI is the default/base behavior (no adapter needed)
         # Other providers get their specific adapters
-        self.adapter = self._detect_adapter(config.api.name)
+        self.adapter = self._detect_adapter(config.api.name, config_file_path)
         if self.adapter:
             adapter_name = self.adapter.__class__.__name__
             console.print(f"   ✨ Using {adapter_name} for request/response transformation")
@@ -143,19 +157,9 @@ class OptimizationRunner:
                 )
                 logger.info("[AGENT SOCIETY] SAO (Self-Alignment Optimization) enabled")
         
-        # API Adapter (for complex APIs like BrowserBase)
-        self.api_adapter = None
-        if config.api.adapter_enabled:
-            adapter_name = config.api.name.lower()
-            if adapter_name == "browserbase":
-                try:
-                    self.api_adapter = BrowserBaseAdapter()
-                    print(f"✅ Loaded {adapter_name} adapter")
-                except ValueError as e:
-                    print(f"⚠️ Adapter initialization failed: {e}")
-                    print(f"⚠️ Falling back to mock mode")
-                    # Force mock mode if adapter fails
-                    self.config.api.mock_mode = True
+        # Legacy API Adapter code - now handled by _detect_adapter() above
+        # Keeping this for reference but it's no longer used
+        self.api_adapter = self.adapter  # Point to the same adapter for backwards compatibility
         
         # Storage
         self._init_storage()
@@ -192,19 +196,38 @@ class OptimizationRunner:
             path = "./data/optimization"
         
         registry = get_storage_registry()
-        self.storage = registry.get(
-            backend,
-            sqlite_path=f"{path}/optimization.db",
-            file_base_dir=f"{path}/files"
-        )
+        
+        # Pass appropriate parameters based on backend type
+        if backend == "convex":
+            # Convex storage - no file paths needed, uses auto-import
+            self.storage = registry.get(backend)
+        elif backend in ["multi", "sqlite", "file"]:
+            # File-based storage - needs paths
+            self.storage = registry.get(
+                backend,
+                sqlite_path=f"{path}/optimization.db",
+                file_base_dir=f"{path}/files"
+            )
+        else:
+            # Generic - let registry handle it
+            self.storage = registry.get(backend)
     
-    def _detect_adapter(self, api_name: str):
+    def _detect_adapter(self, api_name: str, config_file_path: Optional[Path] = None):
         """Detect and return appropriate API adapter based on API name."""
         if not ADAPTERS_AVAILABLE:
             return None
         
         api_name_lower = api_name.lower()
         
+        # Check for Agno agent adapters first (they need special handling)
+        if "agno" in api_name_lower and "reddit" in api_name_lower:
+            if AgnoRedditAdapter:
+                return AgnoRedditAdapter(self.config.dict(), config_file_path)
+            else:
+                console.print("[yellow]⚠️  AgnoRedditAdapter not available[/yellow]")
+                return None
+        
+        # Standard API adapters
         if "openai" in api_name_lower:
             return OpenAIAdapter()
         elif "azure" in api_name_lower:
@@ -497,6 +520,47 @@ class OptimizationRunner:
                     done=(generation == self.config.optimization.evolution.generations - 1)
                 )
                 
+                # Log detailed RLP metrics to W&B
+                if WEAVE_AVAILABLE and weave:
+                    @weave.op()
+                    def log_rlp_training(
+                        generation: int,
+                        thought: str,
+                        reward: float,
+                        normalized_reward: float,
+                        rlp_stats: Dict[str, Any],
+                        best_score: float,
+                        config_count: int,
+                        information_gain: float
+                    ):
+                        return {
+                            "generation": generation,
+                            "thought_length": len(thought),
+                            "thought_preview": thought[:100],
+                            "raw_reward": reward,
+                            "normalized_reward": normalized_reward,
+                            "information_gain": information_gain,
+                            "mean_reward": rlp_stats.get('mean_reward', 0),
+                            "reward_trend": rlp_stats.get('reward_trend', 'stable'),
+                            "total_episodes": rlp_stats.get('total_episodes', 0),
+                            "buffer_size": rlp_stats.get('buffer_size', 0),
+                            "best_score": best_score,
+                            "configs_tested": config_count,
+                            "rlp_active": True
+                        }
+                    
+                    # Call the Weave-tracked function
+                    log_rlp_training(
+                        generation=generation,
+                        thought=thought,
+                        reward=information_gain,
+                        normalized_reward=updated_state.get('rlp_stats', {}).get('mean_normalized_reward', 0),
+                        rlp_stats=updated_state.get('rlp_stats', {}),
+                        best_score=current_best,
+                        config_count=len(population),
+                        information_gain=information_gain
+                    )
+                
                 # Log learning metrics
                 if 'rlp_stats' in updated_state:
                     stats = updated_state['rlp_stats']
@@ -558,6 +622,39 @@ class OptimizationRunner:
                             # Store in SAO dataset
                             sao_stats = self.sao_agent.get_generation_stats()
                             print(f"   📈 SAO Dataset: {sao_stats['dataset_size']} total samples")
+                            
+                            # Log detailed SAO metrics to W&B
+                            if WEAVE_AVAILABLE and weave:
+                                @weave.op()
+                                def log_sao_generation(
+                                    generation: int,
+                                    synthetic_samples: int,
+                                    sao_stats: Dict[str, Any],
+                                    optimization_history_size: int,
+                                    best_score: float
+                                ):
+                                    return {
+                                        "generation": generation,
+                                        "synthetic_samples_generated": synthetic_samples,
+                                        "total_dataset_size": sao_stats.get('dataset_size', 0),
+                                        "unique_prompts": sao_stats.get('unique_prompts', 0),
+                                        "diversity_score": sao_stats.get('diversity_score', 0),
+                                        "quality_filtered": sao_stats.get('quality_filtered', 0),
+                                        "duplicates_filtered": sao_stats.get('duplicates_filtered', 0),
+                                        "rounds_completed": sao_stats.get('rounds_completed', 0),
+                                        "optimization_history_size": optimization_history_size,
+                                        "best_score": best_score,
+                                        "sao_active": True
+                                    }
+                                
+                                # Call the Weave-tracked function
+                                log_sao_generation(
+                                    generation=generation,
+                                    synthetic_samples=len(synthetic_data),
+                                    sao_stats=sao_stats,
+                                    optimization_history_size=len(self.history),
+                                    best_score=self.best_score
+                                )
                         else:
                             print("   ⚠️ SAO generation failed")
                     else:
@@ -625,9 +722,12 @@ class OptimizationRunner:
         if self.config.society and self.config.society.enabled:
             print(f"\n🤖 AGENT SOCIETY CONTRIBUTIONS:")
             if self.rlp_agent:
-                print(f"   • RLP (Reasoning): Active")
+                rlp_stats = getattr(self.rlp_agent, 'experience_buffer', None)
+                episodes = len(rlp_stats.buffer) if rlp_stats else 0
+                print(f"   • RLP (Reasoning): Active - {episodes} experiences learned")
             if self.sao_agent:
-                print(f"   • SAO (Self-Improvement): Active")
+                sao_stats = self.sao_agent.get_generation_stats()
+                print(f"   • SAO (Self-Improvement): Active - {sao_stats['dataset_size']} synthetic samples")
             if self.rl_optimizer and self.rl_optimizer.policy:
                 stats = self.rl_optimizer.get_statistics()
                 print(f"   • RL Meta-Policy: Trained (v{stats['policy_version']})")
@@ -841,6 +941,35 @@ class OptimizationRunner:
         """Make API call with retry logic."""
         max_retries = self.config.optimization.execution.max_retries
         
+        # Special handling for Agno adapters - they execute agents instead of HTTP calls
+        if self.adapter and AgnoRedditAdapter and isinstance(self.adapter, AgnoRedditAdapter):
+            try:
+                # Agno adapter executes the agent and returns result directly
+                result = self.adapter.transform_request(config, test_case)
+                
+                # Transform response format
+                result = self.adapter.transform_response(result)
+                
+                # Convert to APIResponse format
+                latency_ms = result.get('latency_seconds', 0.0) * 1000
+                
+                return APIResponse(
+                    success=True,
+                    result=result,
+                    latency_ms=latency_ms,
+                    error=result.get('error', None)
+                )
+            except Exception as e:
+                error_msg = f"Agno agent execution failed: {str(e)}"
+                console.print(f"   [red]❌ {error_msg}[/red]")
+                return APIResponse(
+                    success=False,
+                    result=None,
+                    latency_ms=0.0,
+                    error=error_msg
+                )
+        
+        # Standard HTTP API call flow
         # Prepare request payload (merge test case input with config parameters)
         payload = {**test_case.get("input", {}), **config}
         

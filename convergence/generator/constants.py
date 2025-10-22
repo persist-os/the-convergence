@@ -8,7 +8,7 @@ import os
 
 # Default LLM model for RLP/SAO reasoning
 # Can be overridden with LLM_MODEL environment variable
-DEFAULT_LLM_MODEL = os.environ.get("LLM_MODEL")
+DEFAULT_LLM_MODEL = os.environ.get("LLM_MODEL", "gemini/gemini-2.0-flash-exp")
 
 # Alternative models (uncomment to change default):
 # DEFAULT_LLM_MODEL = "gemini/gemini-2.5-pro"  # More capable but slower
