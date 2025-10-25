@@ -116,6 +116,11 @@ society:
   learning:
     rlp_enabled: true
     sao_enabled: true
+  llm:
+    model: "gemini/gemini-2.0-flash-exp"
+    api_key_env: "GEMINI_API_KEY"
+    temperature: 0.7
+    max_tokens: 1000
   storage:
     backend: "multi"
     path: "data/browserbase_optimization"

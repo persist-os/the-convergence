@@ -11,8 +11,16 @@ import json
 class WebAutomationTemplate:
     """Template for web automation APIs like BrowserBase."""
     
-    def generate_config(self, endpoint: str, api_key_env: str, description: str) -> Dict[str, Any]:
-        """Generate web automation API configuration."""
+    def generate_config(self, endpoint: str, api_key_env: str, description: str, provider_name: str = None, models: List[str] = None) -> Dict[str, Any]:
+        """Generate web automation API configuration.
+        
+        Args:
+            endpoint: API endpoint URL
+            api_key_env: Environment variable name for API key
+            description: Description of the API functionality
+            provider_name: Provider name (unused for web automation templates, for API consistency)
+            models: List of models (unused for web automation templates, for API consistency)
+        """
         return {
             'api': {
                 'name': 'custom_web_automation',
@@ -260,8 +268,13 @@ def _score_resource_efficiency(browser_data, expected, params):
         """Generate JSON content from test cases."""
         return json.dumps({"test_cases": test_cases}, indent=2)
     
-    def generate_readme_content(self, config: Dict[str, Any]) -> str:
-        """Generate README content."""
+    def generate_readme_content(self, config: Dict[str, Any], provider_name: str = None) -> str:
+        """Generate README content.
+        
+        Args:
+            config: Configuration dictionary
+            provider_name: Provider name (unused for web automation templates, for API consistency)
+        """
         return f"""# Custom Web Automation Optimization
 
 This configuration optimizes API calls to **{config['api']['name']}** at `{config['api']['endpoint']}`.

@@ -1,0 +1,166 @@
+# OpenAI API Optimization Configuration
+# Comprehensive example demonstrating ALL available configuration options
+# Documentation: https://platform.openai.com/docs/api-reference/responses
+#
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# SETUP:
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+#
+# 1. Get API key: https://platform.openai.com/api-keys
+# 2. Set environment variable: export OPENAI_API_KEY="sk-..."
+# 3. Run: convergence optimize examples/ai/openai/openai_optimization.yaml
+
+api:
+  name: "openai"
+  description: "OpenAI API with comprehensive optimization"
+  endpoint: "https://api.openai.com/v1/responses"
+  
+  auth:
+    type: "bearer"
+    token_env: "OPENAI_API_KEY"
+  
+  request:
+    method: "POST"
+    headers:
+      Content-Type: "application/json"
+    timeout_seconds: 60
+  
+  response:
+    success_field: "status"
+    result_field: "output"
+    error_field: "error"
+  
+  adapter_enabled: false
+  mock_mode: false
+
+search_space:
+  parameters:
+    # Model selection
+    model:
+      type: "categorical"
+      values:
+        - "gpt-4.1-mini"
+        - "gpt-4.1-nano"
+        - "gpt-4o-mini"
+    
+    # Temperature
+    temperature:
+      type: "continuous"
+      min: 0.0
+      max: 1.0
+      step: 0.1
+    
+    # Max output tokens (Responses API uses max_output_tokens)
+    max_output_tokens:
+      type: "discrete"
+      values: [512, 1024, 2048, 4096]
+
+evaluation:
+  test_cases:
+    path: "openai_responses_tests.json"
+    augmentation:
+      enabled: true
+      mutation_rate: 0.3
+      crossover_rate: 0.2
+      augmentation_factor: 2
+      preserve_originals: true
+  
+  custom_evaluator:
+    enabled: true
+    module: "openai_responses"
+    function: "score_openai_response"
+  
+  metrics:
+    response_quality:
+      weight: 0.40
+      type: "higher_is_better"
+      function: "custom"
+    latency_ms:
+      weight: 0.25
+      type: "lower_is_better"
+      threshold: 5000
+    cost_per_call:
+      weight: 0.20
+      type: "lower_is_better"
+      budget_per_call: 0.10
+    token_efficiency:
+      weight: 0.15
+      type: "higher_is_better"
+      function: "custom"
+
+optimization:
+  algorithm: "mab_evolution"
+  
+  mab:
+    strategy: "thompson_sampling"
+    exploration_rate: 0.2
+    confidence_level: 0.95
+  
+  evolution:
+    population_size: 4
+    generations: 3
+    mutation_rate: 0.3
+    crossover_rate: 0.7
+    elite_size: 1
+  
+  execution:
+    experiments_per_generation: 12
+    parallel_workers: 2
+    max_retries: 3
+    early_stopping:
+      enabled: true
+      patience: 2
+      min_improvement: 0.01
+
+output:
+  save_path: "./results/openai_optimization"
+  save_all_experiments: true
+  formats: ["json", "markdown", "csv"]
+  visualizations:
+    - "score_over_time"
+    - "parameter_importance"
+    - "pareto_front"
+    - "cost_vs_quality"
+  export_best_config:
+    enabled: true
+    format: "python"
+    output_path: "./best_openai_config.py"
+
+# Agent Society: AI agents that help optimize your API
+# This is DIFFERENT from the API being optimized above
+# Society agents need their own LLM for coordination, reasoning, and self-improvement
+society:
+  enabled: true
+  auto_generate_agents: true
+  
+  learning:
+    rlp_enabled: true   # Reasoning-based Learning: Agents think before making decisions
+    sao_enabled: true   # Self-Alignment: Agents generate their own training data
+  
+  collaboration:
+    enabled: true
+    trust_threshold: 0.7
+  
+  # LLM for agent society (coordination, reasoning, not the API being optimized)
+  llm:
+    model: "gemini/gemini-2.0-flash-exp"  # LiteLLM format: Gemini 2.0 Flash for fast reasoning
+    api_key_env: "GEMINI_API_KEY"        # Separate API key for agent coordination
+    temperature: 0.7                      # Lower = more focused reasoning
+    max_tokens: 1000                      # How long agent reasoning can be (short = faster)
+  
+  storage:
+    backend: "multi"
+    path: "./data/optimization"
+    cache_enabled: true
+  
+  weave:
+    enabled: true
+    project: "openai-optimization"
+
+legacy:
+  enabled: true
+  session_id: "openai_optimization"
+  tracking_backend: "builtin"
+  sqlite_path: "./data/legacy.db"
+  export_dir: "./legacy_exports"
+  export_formats: ["winners_only", "full_audit"]

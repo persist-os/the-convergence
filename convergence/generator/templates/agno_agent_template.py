@@ -11,21 +11,79 @@ import json
 class AgnoAgentTemplate:
     """Template for Agno agent APIs."""
     
-    def generate_config(self, endpoint: str, api_key_env: str, description: str) -> Dict[str, Any]:
-        """Generate Agno agent API configuration."""
+    def generate_config(self, endpoint: str, api_key_env: str, description: str, provider_name: str = None, models: List[str] = None) -> Dict[str, Any]:
+        """Generate Agno agent API configuration.
+        
+        Args:
+            endpoint: API endpoint URL (for LLM provider, e.g., Azure OpenAI)
+            api_key_env: Environment variable name for LLM provider API key
+            description: Description of the API functionality
+            provider_name: LLM provider name (e.g., 'azure', 'openai')
+            models: List of model deployment names
+        """
+        # Default to Azure OpenAI structure if not specified
+        if not provider_name:
+            provider_name = 'azure'
+        if not models:
+            models = ['gpt-4-1']
+        
+        # Use provider-specific endpoint
+        if not endpoint or endpoint == 'https://api.example.com/v1/agent':
+            endpoint = 'https://YOUR_RESOURCE.openai.azure.com' if provider_name == 'azure' else 'https://api.openai.com/v1'
+        
         return {
             'api': {
                 'name': 'custom_agno_agent',
-                'endpoint': endpoint or 'https://api.example.com/v1/agent',
+                'description': f'Agno agent with custom tools via {provider_name}',
+                'endpoint': 'https://placeholder-see-agent-models-registry',  # Managed by model registry
                 'adapter_enabled': True,  # Enable agent adapter
-                'auth': {'type': 'bearer', 'token_env': api_key_env}
+                'request': {
+                    'method': 'POST',
+                    'headers': {'Content-Type': 'application/json'},
+                    'timeout_seconds': 120
+                },
+                'auth': {
+                    'type': 'api_key',
+                    'token_env': api_key_env,
+                    'header_name': 'api-key' if provider_name == 'azure' else 'Authorization'
+                }
+            },
+            'agent': {
+                # Tool-specific authentication (customize based on your tools)
+                'tool_auth': {
+                    'example_tool_key_env': 'TOOL_API_KEY',
+                    'user_agent': 'the-convergence-agent-tester/1.0'
+                },
+                # Model Registry: Define all available LLM models
+                'models': self._generate_model_registry(models, endpoint, api_key_env, provider_name)
             },
             'search_space': {
                 'parameters': {
-                    'instruction_style': {'type': 'categorical', 'values': ['minimal', 'detailed', 'structured']},
-                    'tool_selection_strategy': {'type': 'categorical', 'values': ['all', 'minimal', 'adaptive']},
-                    'reasoning_temperature': {'type': 'continuous', 'min': 0.1, 'max': 1.0, 'step': 0.1},
-                    'max_reasoning_tokens': {'type': 'discrete', 'values': [256, 512, 1024, 2048]}
+                    'model': {
+                        'type': 'categorical',
+                        'values': models,  # Reference model registry keys
+                        'description': 'Model key from agent.models registry'
+                    },
+                    'temperature': {
+                        'type': 'categorical',
+                        'values': [0.0, 0.2, 0.4, 0.6, 0.8, 1.0],
+                        'description': 'Temperature: 0.0=deterministic, 1.0=creative'
+                    },
+                    'max_completion_tokens': {
+                        'type': 'discrete',
+                        'values': [500, 1000, 2000, 4000],
+                        'description': 'Max tokens for agent response'
+                    },
+                    'instruction_style': {
+                        'type': 'categorical',
+                        'values': ['minimal', 'detailed', 'structured'],
+                        'description': 'Agent instruction/prompting style'
+                    },
+                    'tool_strategy': {
+                        'type': 'categorical',
+                        'values': ['include_specific', 'include_all'],
+                        'description': 'Which tools to include'
+                    }
                 }
             },
             'evaluation': {
@@ -75,6 +133,37 @@ class AgnoAgentTemplate:
                 'export_dir': './legacy_exports'
             }
         }
+    
+    def _generate_model_registry(self, models: List[str], endpoint: str, api_key_env: str, provider_name: str) -> Dict[str, Any]:
+        """Generate model registry for agent configuration.
+        
+        Args:
+            models: List of model deployment names
+            endpoint: LLM provider endpoint
+            api_key_env: Environment variable for LLM API key (not used per model)
+            provider_name: Provider name (e.g., 'azure', 'openai')
+        
+        Returns:
+            Dictionary mapping model names to their configurations
+        """
+        model_registry = {}
+        
+        for model in models:
+            if provider_name == 'azure':
+                # Generate full endpoint URL for Azure
+                full_endpoint = f"{endpoint}/openai/deployments/{model}/chat/completions?api-version=2025-01-01-preview"
+                model_registry[model] = {
+                    'endpoint': full_endpoint,
+                    'description': f'{model} deployment'
+                }
+            else:
+                # OpenAI or other providers
+                model_registry[model] = {
+                    'endpoint': endpoint,
+                    'description': f'{model} model'
+                }
+        
+        return model_registry
     
     def generate_test_cases(self, description: str) -> List[Dict]:
         """Generate agent test cases based on Reddit example."""
@@ -252,18 +341,30 @@ def _score_response_quality(agent_data, expected, params):
     
     def generate_yaml_content(self, config: Dict[str, Any]) -> str:
         """Generate YAML content from config."""
+        # Get model info for helpful comments
+        models = list(config.get('agent', {}).get('models', {}).keys())
+        model_list = ', '.join(models) if models else 'configured models'
+        
         yaml_content = f"""# Custom Agno Agent API Optimization Configuration
 # Generated by Convergence Custom Template Generator
 # 
 # API: {config['api']['name']}
-# Endpoint: {config['api']['endpoint']}
-# Generated: 2025-01-23 10:30:00
+# Description: {config['api']['description']}
 #
 # Required Environment Variables:
-#   {config['api']['auth']['token_env']} - Your API key
+#   {config['api']['auth']['token_env']} - LLM provider API key (e.g., Azure OpenAI, OpenAI)
+#   TOOL_API_KEY - Tool-specific API key (if your agent uses authenticated tools)
 #
-# Set before running:
-#   export {config['api']['auth']['token_env']}='your-actual-key-here'
+# Setup:
+#   1. Set LLM provider credentials:
+#      export {config['api']['auth']['token_env']}='your-llm-provider-key'
+#   2. Update agent.models registry below with your LLM deployments
+#   3. Configure agent.tool_auth with your tool-specific credentials
+#   4. Select models to test in search_space.parameters.model.values
+#
+# Model Registry:
+#   Models configured: {model_list}
+#   Update azure_deployment, azure_endpoint, and api_version for each model
 
 """
         yaml_content += yaml.dump(config, default_flow_style=False, sort_keys=False)
@@ -273,35 +374,80 @@ def _score_response_quality(agent_data, expected, params):
         """Generate JSON content from test cases."""
         return json.dumps({"test_cases": test_cases}, indent=2)
     
-    def generate_readme_content(self, config: Dict[str, Any]) -> str:
-        """Generate README content."""
+    def generate_readme_content(self, config: Dict[str, Any], provider_name: str = None) -> str:
+        """Generate README content.
+        
+        Args:
+            config: Configuration dictionary
+            provider_name: Provider name (unused for agent templates, for API consistency)
+        """
+        # Get model info from agent config
+        models = list(config.get('agent', {}).get('models', {}).keys())
+        model_list = ', '.join(models) if models else 'configured models'
+        
         return f"""# Custom Agno Agent Optimization
 
-This configuration optimizes API calls to **{config['api']['name']}** at `{config['api']['endpoint']}`.
+This configuration optimizes Agno agent calls using **{config['api']['description']}**.
 
 ## Setup
 
-1. **Set your API key environment variable:**
-   ```bash
-   export {config['api']['auth']['token_env']}='your-actual-api-key-value'
-   ```
-   
-   **Important:** Replace `your-actual-api-key-value` with your real API key, not the variable name.
+### 1. Set LLM Provider API Key
 
-2. **Update the endpoint (if needed):**
-   Edit `optimization.yaml` and change the `endpoint` field to your actual API endpoint.
+Agno agents use an underlying LLM provider (Azure OpenAI, OpenAI, etc.):
 
-3. **Run optimization:**
-   ```bash
-   convergence optimize optimization.yaml
-   ```
+```bash
+export {config['api']['auth']['token_env']}='your-llm-provider-api-key'
+```
+
+**Important:** This is your LLM provider API key (e.g., Azure OpenAI key), NOT an "Agno API key".
+
+### 2. Configure Tool-Specific Credentials (if needed)
+
+If your agent uses tools that require authentication, set those credentials:
+
+```bash
+# Example: If using Reddit tools
+export TOOL_API_KEY='your-tool-api-key'
+```
+
+Update the `agent.tool_auth` section in `optimization.yaml` with your specific tool requirements.
+
+### 3. Update Model Registry
+
+Edit the `agent.models` section in `optimization.yaml` to configure your LLM deployments.
+The template includes: {model_list}
+
+For Azure OpenAI, update the `endpoint` field for each model:
+```yaml
+models:
+  gpt-4:
+    endpoint: "https://your-resource.openai.azure.com/openai/deployments/gpt-4/chat/completions?api-version=2025-01-01-preview"
+  o4-mini:
+    endpoint: "https://your-resource.openai.azure.com/openai/deployments/o4-mini/chat/completions?api-version=2025-01-01-preview"
+```
+
+For OpenAI, update the `endpoint` field (same endpoint for all models):
+```yaml
+models:
+  gpt-4:
+    endpoint: "https://api.openai.com/v1/chat/completions"
+  gpt-3.5-turbo:
+    endpoint: "https://api.openai.com/v1/chat/completions"
+```
+
+### 4. Run Optimization
+
+```bash
+convergence optimize optimization.yaml
+```
 
 ## What's Being Optimized
 
+- **model**: {', '.join(config['search_space']['parameters']['model']['values'])}
+- **temperature**: {', '.join(map(str, config['search_space']['parameters']['temperature']['values']))}
+- **max_completion_tokens**: {', '.join(map(str, config['search_space']['parameters']['max_completion_tokens']['values']))}
 - **instruction_style**: {', '.join(config['search_space']['parameters']['instruction_style']['values'])}
-- **tool_selection_strategy**: {', '.join(config['search_space']['parameters']['tool_selection_strategy']['values'])}
-- **reasoning_temperature**: {config['search_space']['parameters']['reasoning_temperature']['min']} to {config['search_space']['parameters']['reasoning_temperature']['max']} (step: {config['search_space']['parameters']['reasoning_temperature']['step']})
-- **max_reasoning_tokens**: {', '.join(map(str, config['search_space']['parameters']['max_reasoning_tokens']['values']))}
+- **tool_strategy**: {', '.join(config['search_space']['parameters']['tool_strategy']['values'])}
 
 ## Test Cases
 

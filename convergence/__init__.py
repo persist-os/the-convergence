@@ -10,7 +10,7 @@ Usage:
     SDK: from convergence import run_optimization
 """
 
-__version__ = "0.1.0"
+__version__ = "0.1.3"
 
 from convergence.core.protocols import (
     LLMProvider,

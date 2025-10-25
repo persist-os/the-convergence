@@ -1,5 +1,5 @@
 """
-Custom evaluator for Azure OpenAI o4-mini reasoning tasks
+Custom evaluator for Azure multi-model optimization
 """
 
 import json
@@ -8,12 +8,12 @@ import re
 from typing import Dict, Any, Optional
 
 
-def score_o4_mini_response(result: Any, expected: Any, params: Dict[str, Any], metric: Optional[str] = None) -> float:
+def score_azure_response(result: Any, expected: Any, params: Dict[str, Any], metric: Optional[str] = None) -> float:
     """
-    Score o4-mini API response for reasoning tasks
+    Score Azure API response for multi-model optimization tasks
     
     Args:
-        result: API response from o4-mini
+        result: API response from Azure OpenAI
         expected: Expected outcomes from test case
         params: Parameters used for the request
         metric: Specific metric to evaluate
@@ -43,7 +43,6 @@ def score_o4_mini_response(result: Any, expected: Any, params: Dict[str, Any], m
     if not response_text:
         # Check if this is due to token limits or content filtering
         if finish_reason == "length":
-            # Token limit reached - provide guidance but return partial score
             print(f"⚠️  Warning: Response truncated due to token limit (finish_reason: 'length')")
             print(f"   Consider increasing max_completion_tokens in your config")
             # Return partial score for metrics we can still evaluate
@@ -71,10 +70,10 @@ def score_o4_mini_response(result: Any, expected: Any, params: Dict[str, Any], m
             )
     
     # Route to appropriate evaluator based on metric
-    if metric == "reasoning_accuracy":
-        return evaluate_reasoning_accuracy(response_text, expected)
-    elif metric == "solution_completeness":
-        return evaluate_solution_completeness(response_text, expected)
+    if metric == "response_quality":
+        return evaluate_response_quality(response_text, expected)
+    elif metric == "response_length":
+        return evaluate_response_length(response_text, expected)
     elif metric == "latency_sec":
         return evaluate_latency(result, params)
     elif metric == "cost_per_task":
@@ -82,10 +81,10 @@ def score_o4_mini_response(result: Any, expected: Any, params: Dict[str, Any], m
     else:
         # Default: average all metrics
         return (
-            evaluate_reasoning_accuracy(response_text, expected) * 0.4 +
-            evaluate_solution_completeness(response_text, expected) * 0.3 +
+            evaluate_response_quality(response_text, expected) * 0.4 +
+            evaluate_response_length(response_text, expected) * 0.2 +
             evaluate_latency(result, params) * 0.2 +
-            evaluate_cost(result, params) * 0.1
+            evaluate_cost(result, params) * 0.2
         )
 
 
@@ -126,105 +125,52 @@ def extract_response_text(result: Any) -> str:
         return ""
 
 
-def evaluate_reasoning_accuracy(response: str, expected: Any) -> float:
-    """Evaluate if the reasoning leads to correct answer"""
-    if not response:
-        return 0.0
-    
-    response_lower = response.lower()
-    
-    # Check for expected answer (basic math problems)
-    if isinstance(expected, dict) and "answer" in expected:
-        answer = str(expected["answer"])
-        if answer.lower() in response_lower:
-            return 1.0
-    
-    # Check for logic puzzle answers (pet assignments)
-    if isinstance(expected, dict):
-        score = 0.0
-        checks = 0
-        
-        # Logic puzzle: check pet assignments
-        if "alex_pet" in expected:
-            checks += 1
-            if "alex" in response_lower and "bird" in response_lower:
-                score += 0.33
-        if "bailey_pet" in expected:
-            checks += 1
-            if "bailey" in response_lower and "bird" in response_lower:
-                score += 0.33
-        if "casey_pet" in expected:
-            checks += 1
-            if "casey" in response_lower and "dog" in response_lower:
-                score += 0.34
-        
-        # Multi-step reasoning: check for numerical answers
-        if "additional_budget" in expected:
-            checks += 1
-            # Look for the expected value (with some tolerance)
-            additional = expected["additional_budget"]
-            # Check for numbers in response
-            import re
-            numbers = re.findall(r'\$?(\d{1,3}(?:,\d{3})*(?:\.\d+)?)', response)
-            numbers = [float(n.replace(',', '')) for n in numbers]
-            
-            # Check if expected value is close to any number in response
-            tolerance = additional * 0.1  # 10% tolerance
-            if any(abs(num - additional) < tolerance for num in numbers):
-                score += 0.5
-        
-        if "percentage_increase" in expected:
-            checks += 1
-            percentage = expected["percentage_increase"]
-            # Look for percentage in response
-            import re
-            percentages = re.findall(r'(\d+\.?\d*)%', response)
-            percentages = [float(p) for p in percentages]
-            
-            tolerance = 2.0  # 2% tolerance
-            if any(abs(pct - percentage) < tolerance for pct in percentages):
-                score += 0.5
-        
-        if checks > 0:
-            return min(score, 1.0)
-    
-    # Fallback: Check for reasoning indicators
-    reasoning_keywords = ["because", "therefore", "so", "thus", "step", "first", "then", "finally"]
-    reasoning_count = sum(1 for kw in reasoning_keywords if kw in response_lower)
-    
-    return min(reasoning_count / 3.0, 1.0)  # Max score if 3+ reasoning words
-
-
-def evaluate_solution_completeness(response: str, expected: Any) -> float:
-    """Evaluate if solution is complete and well-explained"""
+def evaluate_response_quality(response: str, expected: Any) -> float:
+    """Evaluate response quality based on content and structure"""
     if not response:
         return 0.0
     
     score = 0.0
     
-    # Length check (reasonable explanation)
+    # Length check (reasonable response)
     if len(response) > 50:
         score += 0.3
     if len(response) > 150:
         score += 0.2
     
-    # Check for step-by-step reasoning
-    if "step" in response.lower() or any(str(i) in response for i in range(1, 6)):
+    # Check for structured content
+    if any(word in response.lower() for word in ["answer", "result", "solution", "therefore"]):
         score += 0.3
     
-    # Check for conclusion/answer
-    conclusion_words = ["answer", "result", "solution", "therefore", "total"]
-    if any(word in response.lower() for word in conclusion_words):
-        score += 0.2
+    # Check for reasoning indicators
+    reasoning_keywords = ["because", "therefore", "so", "thus", "step", "first", "then", "finally"]
+    reasoning_count = sum(1 for kw in reasoning_keywords if kw in response.lower())
+    score += min(reasoning_count / 3.0, 0.2)  # Max 0.2 for reasoning
     
     return min(score, 1.0)
+
+
+def evaluate_response_length(response: str, expected: Any) -> float:
+    """Evaluate if response length is appropriate"""
+    if not response:
+        return 0.0
+    
+    length = len(response)
+    
+    # Score based on length appropriateness
+    if 100 <= length <= 500:
+        return 1.0
+    elif 50 <= length <= 1000:
+        return 0.8
+    elif 20 <= length <= 2000:
+        return 0.6
+    else:
+        return 0.3
 
 
 def evaluate_latency(result: Any, params: Dict[str, Any]) -> float:
     """
     Evaluate latency (lower is better, but we return higher_is_better score)
-    
-    Handles cases where latency data might be missing or malformed.
     """
     try:
         # Extract latency from result
@@ -267,8 +213,6 @@ def evaluate_latency(result: Any, params: Dict[str, Any]) -> float:
 def evaluate_cost(result: Any, params: Dict[str, Any]) -> float:
     """
     Evaluate cost (lower is better, but we return higher_is_better score)
-    
-    Handles cases where usage data might be missing or malformed.
     """
     try:
         cost_usd = 0.0
@@ -278,7 +222,7 @@ def evaluate_cost(result: Any, params: Dict[str, Any]) -> float:
             prompt_tokens = int(usage.get("prompt_tokens", 0))
             completion_tokens = int(usage.get("completion_tokens", 0))
             
-            # o4-mini pricing (example rates, adjust as needed)
+            # Generic Azure pricing estimate (adjust as needed)
             # $0.15/1M input tokens, $0.60/1M output tokens
             cost_usd = (prompt_tokens * 0.00000015) + (completion_tokens * 0.00000060)
         

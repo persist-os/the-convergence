@@ -33,14 +33,18 @@ from agno.models.azure import AzureOpenAI
 from agno.tools.reddit import RedditTools
 AGNO_AVAILABLE = True
 
-try:
-    import praw
-    _PRAW_AVAILABLE = True 
-except ImportError:
-    _PRAW_AVAILABLE = False
-    
-
 logger = logging.getLogger(__name__)
+
+# Use Async PRAW for async environment compatibility
+try:
+    import asyncpraw
+    _PRAW_AVAILABLE = True
+except ImportError:
+    logger.error(
+        "Async PRAW not installed. Install with: pip install asyncpraw\n"
+        "https://asyncpraw.readthedocs.io/en/stable/"
+    )
+    _PRAW_AVAILABLE = False
 
 
 class RedditAgentRunner:
@@ -169,7 +173,7 @@ class RedditAgentRunner:
         )
         
         # Get model configuration from registry
-        model_key = params.get('model', 'gpt-4-1')  # Default to gpt-4-1
+        model_key = params.get('model', 'gpt-4')  # Default to gpt-4
         model_registry = self.agent_config.get('models', {})
         
         if model_key not in model_registry:
@@ -180,39 +184,36 @@ class RedditAgentRunner:
         
         model_config = model_registry[model_key]
         
-        # Extract model configuration
-        azure_deployment = model_config.get('azure_deployment')
-        azure_endpoint = model_config.get('azure_endpoint')
+        # Extract simplified model configuration
+        endpoint = model_config.get('endpoint')
         api_key_env = model_config.get('api_key_env', 'AZURE_API_KEY')
-        api_version = model_config.get('api_version', '2024-12-01-preview')
         
         # Get API key from environment
         azure_api_key = os.getenv(api_key_env)
         
         if not azure_api_key:
             raise ValueError(f"API key environment variable '{api_key_env}' not set")
-        if not azure_deployment:
-            raise ValueError(f"azure_deployment not specified in model config for '{model_key}'")
-        if not azure_endpoint:
-            raise ValueError(f"azure_endpoint not specified in model config for '{model_key}'")
+        if not endpoint:
+            raise ValueError(f"endpoint not specified in model config for '{model_key}'")
         
         logger.info(f"Creating agent with model: {model_key}")
-        logger.info(f"  Azure deployment: {azure_deployment}")
-        logger.info(f"  Azure endpoint: {azure_endpoint}")
-        logger.info(f"  API version: {api_version}")
+        logger.info(f"  Endpoint: {endpoint}")
         logger.info(f"  Temperature: {params.get('temperature', 0.7)}")
         logger.info(f"  Max tokens: {params.get('max_completion_tokens', 1000)}")
         logger.info(f"  Instruction style: {instruction_style}")
         logger.info(f"  Tool strategy: {tool_strategy}")
         
+        # Extract deployment name and base URL from endpoint for Agno compatibility
+        deployment_name = self._extract_deployment_from_endpoint(endpoint)
+        base_url = self._extract_base_url_from_endpoint(endpoint)
+        
         # Create Azure OpenAI model (Agno 2.1.8 API)
         try:
             model = AzureOpenAI(
-                id=azure_deployment,
-                azure_deployment=azure_deployment,
-                azure_endpoint=azure_endpoint,
+                id=deployment_name,
+                azure_deployment=deployment_name,
+                azure_endpoint=base_url,
                 api_key=azure_api_key,
-                api_version=api_version,  # From model config
                 temperature=params.get('temperature', 0.7),
                 max_completion_tokens=params.get('max_completion_tokens', 1000)
             )
@@ -473,6 +474,34 @@ class RedditAgentRunner:
         logger.info(f"Parsed response: {len(result['tool_calls'])} tool calls, {len(result['tool_results'])} results")
         
         return result
+    
+    def _extract_deployment_from_endpoint(self, endpoint: str) -> str:
+        """
+        Extract deployment name from Azure endpoint URL.
+        
+        Args:
+            endpoint: Full Azure endpoint URL
+            
+        Returns:
+            Deployment name extracted from URL
+        """
+        import re
+        match = re.search(r'/deployments/([^/]+)/', endpoint)
+        return match.group(1) if match else 'default'
+    
+    def _extract_base_url_from_endpoint(self, endpoint: str) -> str:
+        """
+        Extract base URL from Azure endpoint URL.
+        
+        Args:
+            endpoint: Full Azure endpoint URL
+            
+        Returns:
+            Base URL (e.g., https://resource.openai.azure.com)
+        """
+        import re
+        match = re.search(r'(https://[^/]+)', endpoint)
+        return match.group(1) if match else endpoint
 
 
 # Convenience function for testing
@@ -489,18 +518,25 @@ def test_reddit_connection():
         return False
     
     try:
-        import praw
-        reddit = praw.Reddit(
-            client_id=client_id,
-            client_secret=client_secret,
-            user_agent='test-connection/1.0'
-        )
+        import asyncpraw
+        import asyncio
         
-        # Test by getting r/technology info
-        subreddit = reddit.subreddit('technology')
-        print(f"✅ Successfully connected to Reddit")
-        print(f"   r/technology has {subreddit.subscribers:,} subscribers")
-        return True
+        async def test_async():
+            reddit = asyncpraw.Reddit(
+                client_id=client_id,
+                client_secret=client_secret,
+                user_agent='test-connection/1.0'
+            )
+            
+            # Test by getting r/technology info
+            subreddit = await reddit.subreddit('technology')
+            info = await subreddit.load()
+            print(f"✅ Successfully connected to Reddit")
+            print(f"   r/technology has {info.subscribers:,} subscribers")
+            await reddit.close()
+            return True
+        
+        return asyncio.run(test_async())
         
     except Exception as e:
         print(f"❌ Reddit connection failed: {e}")

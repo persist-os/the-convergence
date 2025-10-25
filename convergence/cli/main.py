@@ -318,7 +318,10 @@ def optimize(
         initialize_weave(config)
         
         console.print(f"[green]✓[/green] Loaded config: [bold]{config.api.name}[/bold]")
-        console.print(f"  - Endpoint: {config.api.endpoint}")
+        if config.api.endpoint:
+            console.print(f"  - Endpoint: {config.api.endpoint}")
+        elif config.api.models:
+            console.print(f"  - Models: {', '.join(config.api.models.keys())}")
         console.print(f"  - Parameters: {len(config.search_space.parameters)}")
         console.print(f"  - Metrics: {len(config.evaluation.metrics)}")
         console.print(f"  - Generations: {config.optimization.evolution.generations}")
@@ -482,7 +485,7 @@ This report shows the results of testing different AI settings (configurations) 
 
 ## Configuration
 - **API**: {config.api.name}
-- **Endpoint**: {config.api.endpoint}
+- **Endpoint**: {config.api.endpoint or 'model-registry'}
 - **Parameters Optimized**: {len(config.search_space.parameters)}
 
 ## Results

@@ -45,6 +45,13 @@ def list_available_templates() -> List[Dict[str, Any]]:
             "description": "Optimize Azure-hosted OpenAI - enterprise deployment",
             "features": ["Reasoning tests", "Custom evaluator", "Enterprise config"],
             "test_count": "Multiple"
+        },
+        {
+            "id": "reddit",
+            "name": "Reddit Agent (Agno + Azure)",
+            "description": "Optimize Reddit data retrieval agents with Azure OpenAI",
+            "features": ["4 test cases", "Custom evaluator", "MAB optimization", "Azure model registry"],
+            "test_count": 4
         }
     ]
 
@@ -71,8 +78,8 @@ async def create_preset_config(
     """
     # Template mapping to actual example paths
     template_map = {
-        "openai": {
-            "config": "ai/openai/openai_responses_optimization.yaml",
+            "openai": {
+        "config": "ai/openai/openai_optimization.yaml",
             "tests": "ai/openai/openai_responses_tests.json",
             "evaluator": "ai/openai/openai_responses.py",
             "name": "OpenAI"
@@ -90,10 +97,17 @@ async def create_preset_config(
             "name": "Groq"
         },
         "azure": {
-            "config": "ai/azure/azure_o4_mini/azure_o4_mini_optimization.yaml",
-            "tests": "ai/azure/azure_o4_mini/reasoning_tests.json",
-            "evaluator": "ai/azure/azure_o4_mini/azure_o4_mini_evaluator.py",
+            "config": "ai/azure/azure_multi_model_optimization.yaml",
+            "tests": "ai/azure/azure_test_cases.json",
+            "evaluator": "ai/azure/azure_multi_model_evaluator.py",
             "name": "Azure OpenAI"
+        },
+        "reddit": {
+            "config": "agno_agents/reddit/reddit_agent_optimization.yaml",
+            "tests": "agno_agents/reddit/reddit_test_cases.json",
+            "evaluator": "agno_agents/reddit/reddit_evaluator.py",
+            "runner": "agno_agents/reddit/reddit_agent_runner.py",
+            "name": "Reddit Agent"
         }
     }
     
@@ -111,10 +125,16 @@ async def create_preset_config(
     source_tests = convergence_root / "examples" / template["tests"]
     source_evaluator = convergence_root / "examples" / template["evaluator"]
     
+    # Optional runner file (for Reddit template)
+    source_runner = None
+    if "runner" in template:
+        source_runner = convergence_root / "examples" / template["runner"]
+    
     # Destination files
     config_path = output_dir / "optimization.yaml"
     tests_path = output_dir / "test_cases.json"
     evaluator_path = output_dir / "evaluator.py"
+    runner_path = output_dir / "reddit_agent_runner.py" if source_runner else None
     
     # Verify source files exist
     if not source_config.exists():
@@ -149,6 +169,12 @@ async def create_preset_config(
         shutil.copy2(source_evaluator, evaluator_path)
         evaluator_copied = True
     
+    # Copy runner if it exists (for Reddit template)
+    runner_copied = False
+    if source_runner and source_runner.exists():
+        shutil.copy2(source_runner, runner_path)
+        runner_copied = True
+    
     # Create data directory structure
     (output_dir / "data").mkdir(exist_ok=True)
     (output_dir / "results").mkdir(exist_ok=True)
@@ -162,6 +188,8 @@ async def create_preset_config(
     console.print(f"✅ Copied {test_count} test cases")
     if evaluator_copied:
         console.print(f"✅ Copied custom evaluator")
+    if runner_copied:
+        console.print(f"✅ Copied agent runner")
     console.print("")
     console.print("🎉 [bold green]Template ready![/bold green]")
     console.print("")
@@ -176,6 +204,7 @@ async def create_preset_config(
         'config_path': str(config_path),
         'tests_path': str(tests_path),
         'evaluator_path': str(evaluator_path) if source_evaluator.exists() else None,
+        'runner_path': str(runner_path) if runner_copied else None,
         'test_cases': test_cases.get('test_cases', []) if isinstance(test_cases, dict) else test_cases,
         'config': {},
         'elapsed': 0.1
@@ -222,8 +251,14 @@ def _update_config_paths(config_content: str, preset_name: str) -> str:
         ])
     elif preset_name == "azure":
         replacements.extend([
+            ('path: "azure_test_cases.json"', 'path: "test_cases.json"'),
             ('path: "reasoning_tests.json"', 'path: "test_cases.json"'),
-            ('module: "azure_o4_mini_evaluator"', 'module: "evaluator"'),
+            ('module: "azure_multi_model_evaluator"', 'module: "evaluator"'),
+        ])
+    elif preset_name == "reddit":
+        replacements.extend([
+            ('path: "reddit_test_cases.json"', 'path: "test_cases.json"'),
+            ('module: "reddit_evaluator"', 'module: "evaluator"'),
         ])
     
     # Apply all replacements

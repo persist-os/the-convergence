@@ -37,23 +37,12 @@ The Convergence uses an **adapter pattern** to support multiple API providers wi
 
 ## Available Adapters
 
-### 1. OpenAIAdapter (Baseline)
-**Purpose**: Explicit representation of default behavior  
-**When to use**: Not required - this IS the default behavior  
-**Format**:
-```json
-{
-  "messages": [...],
-  "model": "gpt-4",
-  "temperature": 0.7
-}
-```
-
-### 2. AzureOpenAIAdapter
-**Purpose**: Azure-specific endpoints and responses  
-**When to use**: When using Azure OpenAI Service  
+### 1. AzureOpenAIAdapter
+**Purpose**: Azure-specific multi-endpoint architecture  
+**When to use**: When using Azure OpenAI Service with multiple models  
 **Differences from OpenAI**:
-- Different endpoint structure (includes deployment name)
+- Multiple endpoints (one per model deployment)
+- Dynamic endpoint selection based on model registry
 - Uses `api-key` header instead of Bearer token
 - Otherwise identical to OpenAI
 
@@ -67,7 +56,7 @@ api:
     token_env: "AZURE_API_KEY"
 ```
 
-### 3. GeminiAdapter
+### 2. GeminiAdapter
 **Purpose**: Handle Gemini's nested request/response structure  
 **When to use**: When using Google Gemini API  
 **Differences from OpenAI**:
@@ -109,7 +98,7 @@ api:
     token_env: "OPENAI_API_KEY"
 ```
 
-### 4. BrowserBaseAdapter
+### 3. BrowserBaseAdapter
 **Purpose**: Browser automation session management  
 **When to use**: When optimizing BrowserBase sessions  
 **Special Requirements**:

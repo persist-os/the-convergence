@@ -69,15 +69,31 @@ class ResponseConfig(BaseModel):
     error_field: str = "error"
 
 
+class ModelConfig(BaseModel):
+    """Model configuration in registry."""
+    endpoint: str
+
+
 class APIConfig(BaseModel):
     """API endpoint configuration."""
     name: str
-    endpoint: str
+    description: Optional[str] = None
+    endpoint: Optional[str] = None  # Optional: single endpoint
+    models: Optional[Dict[str, ModelConfig]] = None  # Optional: model registry
     auth: AuthConfig = Field(default_factory=AuthConfig)
     request: RequestConfig = Field(default_factory=RequestConfig)
     response: ResponseConfig = Field(default_factory=ResponseConfig)
     adapter_enabled: bool = False  # Enable API-specific adapter if available
     mock_mode: bool = False  # Skip real API calls, use mock responses
+    
+    @model_validator(mode='after')
+    def validate_endpoint_or_models(self):
+        """Ensure either endpoint or models is provided."""
+        if not self.endpoint and not self.models:
+            raise ValueError("Either 'endpoint' or 'models' must be provided in api config")
+        if self.endpoint and self.models:
+            raise ValueError("Cannot specify both 'endpoint' and 'models' - use one or the other")
+        return self
 
 
 class SearchSpaceParameter(BaseModel):
@@ -273,11 +289,18 @@ class LegacyTrackingConfig(BaseModel):
 
 
 class ModelConfig(BaseModel):
-    """Configuration for a single model in the agent models registry."""
-    azure_deployment: str
-    azure_endpoint: str
-    api_key_env: str = "AZURE_API_KEY"
-    api_version: str = "2024-12-01-preview"
+    """Configuration for a single model in the agent models registry.
+    
+    Uses the simplified format where endpoint is the complete URL (including deployment name and API version).
+    This is the recommended format for all new configurations.
+    
+    Example:
+        models:
+          gpt-4.1:
+            endpoint: "https://your-resource.openai.azure.com/openai/deployments/gpt-4/chat/completions?api-version=2025-01-01-preview"
+            description: "GPT-4 deployment"
+    """
+    endpoint: str  # Full endpoint URL including deployment and API version
     description: Optional[str] = None
 
 

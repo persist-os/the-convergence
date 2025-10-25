@@ -1,6 +1,6 @@
 [project]
 name = "the-convergence"
-version = "0.1.3"
+version = "0.1.4"
 description = "API Optimization Framework powered by evolutionary algorithms, multi-armed bandits, and agent societies"
 authors = [
     {name = "Aria Han", email = "aria@persistos.co"},
@@ -91,9 +91,15 @@ llm = [
     "litellm>=1.0.0",
 ]
 
+# Reddit agent support (Async PRAW for async environment)
+reddit = [
+    "asyncpraw>=7.8.0",
+    "agno>=2.1.8",
+]
+
 # All features
 all = [
-    "the-convergence[agents,llm]",
+    "the-convergence[agents,llm,reddit]",
 ]
 
 # Development tools

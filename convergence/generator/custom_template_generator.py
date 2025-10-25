@@ -11,6 +11,7 @@ from rich.prompt import Prompt, Confirm
 
 from .template_selector import TemplateSelector
 from .templates.llm_chat_template import LLMChatTemplate
+from .templates.azure_chat_template import AzureChatTemplate
 from .templates.agno_agent_template import AgnoAgentTemplate
 from .templates.web_automation_template import WebAutomationTemplate
 
@@ -23,6 +24,7 @@ class CustomTemplateGenerator:
         self.template_selector = TemplateSelector()
         self.templates = {
             'llm_chat': LLMChatTemplate(),
+            'azure_chat': AzureChatTemplate(),
             'agno_agent': AgnoAgentTemplate(),
             'web_automation': WebAutomationTemplate()
         }

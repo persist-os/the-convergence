@@ -34,7 +34,6 @@ from .adapters.browserbase import BrowserBaseAdapter
 
 # API adapters for provider-specific request/response transformations
 try:
-    from .adapters.openai import OpenAIAdapter
     from .adapters.azure import AzureOpenAIAdapter
     from .adapters.gemini import GeminiAdapter
     from .adapters.browserbase import BrowserBaseAdapter
@@ -42,7 +41,6 @@ try:
     ADAPTERS_AVAILABLE = True
 except ImportError:
     ADAPTERS_AVAILABLE = False
-    OpenAIAdapter = None
     AzureOpenAIAdapter = None
     GeminiAdapter = None
     BrowserBaseAdapter = None
@@ -96,8 +94,8 @@ class OptimizationRunner:
         self.evaluator = Evaluator(config.evaluation, config_file_path=config_file_path)
         
         # Initialize API adapter based on provider
-        # OpenAI is the default/base behavior (no adapter needed)
-        # Other providers get their specific adapters
+        # OpenAI-compatible providers (OpenAI, Groq, Anthropic) use default behavior
+        # Only providers that deviate from OpenAI format need adapters
         self.adapter = self._detect_adapter(config.api.name, config_file_path)
         if self.adapter:
             adapter_name = self.adapter.__class__.__name__
@@ -228,10 +226,8 @@ class OptimizationRunner:
                 return None
         
         # Standard API adapters
-        if "openai" in api_name_lower:
-            return OpenAIAdapter()
-        elif "azure" in api_name_lower:
-            return AzureOpenAIAdapter()
+        if "azure" in api_name_lower:
+            return AzureOpenAIAdapter(self.config.dict())
         elif "browserbase" in api_name_lower:
             return BrowserBaseAdapter()
         else:
@@ -405,7 +401,11 @@ class OptimizationRunner:
         print("🚀 STARTING API OPTIMIZATION")
         print("=" * 70)
         print(f"API: {self.config.api.name}")
-        print(f"Endpoint: {self.config.api.endpoint}")
+        if self.config.api.endpoint:
+            print(f"Endpoint: {self.config.api.endpoint}")
+        elif self.config.api.models:
+            model_names = list(self.config.api.models.keys())
+            print(f"Models: {', '.join(model_names)} ({len(model_names)} models)")
         print(f"Search Space: {len(self.config.search_space.parameters)} parameters")
         print(f"Test Cases: {len(self.test_cases)}")
         print(f"Algorithm: {self.config.optimization.algorithm}")
@@ -981,15 +981,42 @@ class OptimizationRunner:
                 console.print(f"   [yellow]⚠️  Adapter transform failed: {e}[/yellow]")
                 # Continue with original payload if adapter fails
         
+        # Get endpoint - use adapter if available, otherwise use hardcoded endpoint
+        if self.adapter and hasattr(self.adapter, 'get_endpoint_for_model'):
+            # Azure-style: dynamic endpoint selection
+            model_key = config.get('model')
+            if not model_key:
+                raise ValueError("Model key required in config parameters")
+            
+            endpoint = self.adapter.get_endpoint_for_model(model_key)
+            if not endpoint:
+                raise ValueError(f"No endpoint found for model '{model_key}' in model registry")
+        else:
+            # Standard providers: use hardcoded endpoint, model goes in request body
+            if not self.config.api.endpoint:
+                raise ValueError("No endpoint or model registry configured. Provide either api.endpoint or api.models")
+            endpoint = self.config.api.endpoint
+        
         # Get auth configuration
         auth_config = {}
         if self.config.api.auth.type == "api_key":
-            # Pass auth config to API caller (for header-based auth like Azure)
-            auth_config = {
-                "type": "api_key",
-                "token_env": self.config.api.auth.token_env,
-                "header_name": getattr(self.config.api.auth, 'header_name', None) or 'x-api-key'
-            }
+            # Check for per-model API key if using adapter
+            if self.adapter and hasattr(self.adapter, 'get_api_key_for_model'):
+                token_env = self.adapter.get_api_key_for_model(config.get('model', ''))
+                if token_env:
+                    auth_config = {
+                        "type": "api_key",
+                        "token_env": token_env,  # Pass env var name, APICaller will look it up
+                        "header_name": getattr(self.config.api.auth, 'header_name', None) or 'x-api-key'
+                    }
+            
+            # Fallback to main auth config
+            if not auth_config:
+                auth_config = {
+                    "type": "api_key",
+                    "token_env": self.config.api.auth.token_env,
+                    "header_name": getattr(self.config.api.auth, 'header_name', None) or 'x-api-key'
+                }
         elif self.config.api.auth.type == "bearer":
             token_env = self.config.api.auth.token_env
             token = os.getenv(token_env) if token_env else None
@@ -1002,9 +1029,9 @@ class OptimizationRunner:
         # Try with retries
         for attempt in range(max_retries):
             try:
-                # Make actual API call
+                # Make actual API call with dynamic endpoint
                 response = await self.api_caller.call(
-                    endpoint=self.config.api.endpoint,
+                    endpoint=endpoint,
                     method=self.config.api.request.method,
                     params=payload,
                     auth=auth_config if auth_config else None,
@@ -1129,7 +1156,7 @@ class OptimizationRunner:
                 self.legacy_session = await self.legacy_store.create_or_get_session(
                     session_id=session_id,
                     api_name=self.config.api.name,
-                    api_endpoint=self.config.api.endpoint,
+                    api_endpoint=self.config.api.endpoint or "model-registry",
                     config_fingerprint=config_fingerprint,
                     name=self.config.legacy.session_id or self.config.api.name
                 )
@@ -1190,7 +1217,7 @@ class OptimizationRunner:
                         session_id=self.legacy_session.session_id,
                         timestamp=datetime.fromisoformat(history_entry.get("timestamp", datetime.utcnow().isoformat())),
                         api_name=self.config.api.name,
-                        api_endpoint=self.config.api.endpoint,
+                        api_endpoint=self.config.api.endpoint or "model-registry",
                         config=history_entry["config"],
                         test_case_ids=test_case_ids,
                         test_results=test_results,

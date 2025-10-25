@@ -108,17 +108,24 @@ optimization:
   
   mab:
     strategy: "thompson_sampling"
+    exploration_rate: 0.2
+    confidence_level: 0.95
   
   evolution:
     population_size: 3      # Even smaller to avoid rate limits
     generations: 2          # Just 2 generations for minimal testing
+    mutation_rate: 0.3
+    crossover_rate: 0.7
+    elite_size: 1
   
   execution:
     experiments_per_generation: 10  # Reduced from 45
     parallel_workers: 1             # Sequential to respect 30 RPM rate limit
     max_retries: 5                  # Retry with exponential backoff for rate limits
     early_stopping:
-      enabled: false                # Disabled for testing
+      enabled: true
+      patience: 2
+      min_improvement: 0.01
     # Note: Sequential execution with delays to avoid rate limits
     # 4 configs × 6 test cases = 24 API calls per generation (under 30 RPM)
 
@@ -136,10 +143,24 @@ output:
     format: "yaml"                                  # Export as YAML for easy reuse
     output_path: "examples/results/groq_optimization/best_config.yaml"
 
-# Legacy warm-start: Reuse previous winners across runs
+society:
+  enabled: false
+  auto_generate_agents: true
+  learning:
+    rlp_enabled: true
+    sao_enabled: true
+  collaboration:
+    enabled: true
+    trust_threshold: 0.7
+  llm:
+    model: "gemini/gemini-2.0-flash-exp"
+    api_key_env: "GEMINI_API_KEY"
+    temperature: 0.7
+    max_tokens: 1000
+
 legacy:
   enabled: true
-  session_id: "groq_optimization"  # Session name (fingerprint auto-appended)
+  session_id: "groq_optimization"
   tracking_backend: "builtin"
   sqlite_path: "./data/legacy.db"
   export_dir: "./legacy"

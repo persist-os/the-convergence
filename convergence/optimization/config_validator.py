@@ -62,31 +62,83 @@ class ConfigValidator:
                 "Please add an 'api' section to your optimization.yaml file."
             )
         
-        # Check endpoint
-        endpoint = api_config.get('endpoint', '')
-        if not endpoint:
+        # Check for either endpoint OR models registry
+        endpoint = api_config.get('endpoint')
+        models = api_config.get('models')
+        
+        if not endpoint and not models:
             raise ConfigValidationError(
-                "API endpoint is missing.\n"
-                "Please specify an 'endpoint' in the 'api' section of your optimization.yaml file."
+                "API endpoint or models registry is missing.\n"
+                "Please specify either:\n"
+                "  1. An 'endpoint' in the 'api' section (single endpoint), OR\n"
+                "  2. A 'models' registry in the 'api' section (multi-model support).\n"
+                "For example:\n"
+                "  api:\n"
+                "    endpoint: https://api.openai.com/v1/chat/completions\n"
+                "  OR\n"
+                "  api:\n"
+                "    models:\n"
+                "      model-name:\n"
+                "        endpoint: https://..."
             )
         
-        # Check for template endpoints
-        if 'api.example.com' in endpoint:
-            raise ConfigValidationError(
-                f"Template endpoint detected: {endpoint}\n"
-                f"Please replace this with your actual API endpoint in optimization.yaml.\n"
-                f"For example:\n"
-                f"  - Groq: https://api.groq.com/openai/v1/chat/completions\n"
-                f"  - OpenAI: https://api.openai.com/v1/chat/completions\n"
-                f"  - Anthropic: https://api.anthropic.com/v1/messages"
-            )
+        # Validate endpoint format if provided
+        if endpoint:
+            # Check for template endpoints
+            if 'api.example.com' in endpoint:
+                raise ConfigValidationError(
+                    f"Template endpoint detected: {endpoint}\n"
+                    f"Please replace this with your actual API endpoint in optimization.yaml.\n"
+                    f"For example:\n"
+                    f"  - Groq: https://api.groq.com/openai/v1/chat/completions\n"
+                    f"  - OpenAI: https://api.openai.com/v1/chat/completions\n"
+                    f"  - Anthropic: https://api.anthropic.com/v1/messages"
+                )
+            
+            # Check for placeholder endpoints
+            if 'your-resource' in endpoint or 'your-model' in endpoint:
+                raise ConfigValidationError(
+                    f"Placeholder endpoint detected: {endpoint}\n"
+                    f"Please replace the placeholder values with your actual resource and model names."
+                )
         
-        # Check for placeholder endpoints
-        if 'your-resource' in endpoint or 'your-model' in endpoint:
-            raise ConfigValidationError(
-                f"Placeholder endpoint detected: {endpoint}\n"
-                f"Please replace the placeholder values with your actual resource and model names."
-            )
+        # Validate models registry if provided
+        if models:
+            if not isinstance(models, dict):
+                raise ConfigValidationError(
+                    "The 'models' field must be a dictionary mapping model names to their configurations.\n"
+                    "For example:\n"
+                    "  models:\n"
+                    "    gpt-4:\n"
+                    "      endpoint: https://..."
+                )
+            
+            if not models:
+                raise ConfigValidationError(
+                    "The 'models' registry is empty.\n"
+                    "Please add at least one model to the models registry."
+                )
+            
+            # Validate each model has an endpoint
+            for model_name, model_config in models.items():
+                if not isinstance(model_config, dict):
+                    raise ConfigValidationError(
+                        f"Model '{model_name}' configuration must be a dictionary."
+                    )
+                
+                model_endpoint = model_config.get('endpoint')
+                if not model_endpoint:
+                    raise ConfigValidationError(
+                        f"Model '{model_name}' is missing an 'endpoint' field.\n"
+                        f"Please specify the endpoint for '{model_name}' in the models registry."
+                    )
+                
+                # Check for placeholder endpoints in model registry
+                if 'your-resource' in model_endpoint or 'your-model' in model_endpoint:
+                    raise ConfigValidationError(
+                        f"Placeholder endpoint detected for model '{model_name}': {model_endpoint}\n"
+                        f"Please replace the placeholder values with your actual resource and model names."
+                    )
         
         # Check authentication
         auth_config = api_config.get('auth', {})
@@ -119,28 +171,20 @@ class ConfigValidator:
                 "Please add parameters to optimize in the 'search_space.parameters' section."
             )
         
-        # Check for model parameter (required for LLM APIs)
-        if 'model' not in parameters:
-            raise ConfigValidationError(
-                "Model parameter is missing from search space.\n"
-                "Please add a 'model' parameter to optimize different models.\n"
-                "Example:\n"
-                "  model:\n"
-                "    type: categorical\n"
-                "    values: ['gpt-4o-mini', 'gpt-3.5-turbo']"
-            )
-        
-        model_config = parameters.get('model', {})
-        model_values = model_config.get('values', [])
-        if not model_values:
-            raise ConfigValidationError(
-                "Model parameter has no values defined.\n"
-                "Please specify the models to test in the 'model.values' array.\n"
-                "Example:\n"
-                "  model:\n"
-                "    type: categorical\n"
-                "    values: ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant']"
-            )
+        # Check for model parameter (required for LLM APIs only)
+        # Note: Some APIs like BrowserBase don't use model parameters
+        if 'model' in parameters:
+            model_config = parameters.get('model', {})
+            model_values = model_config.get('values', [])
+            if not model_values:
+                raise ConfigValidationError(
+                    "Model parameter has no values defined.\n"
+                    "Please specify the models to test in the 'model.values' array.\n"
+                    "Example:\n"
+                    "  model:\n"
+                    "    type: categorical\n"
+                    "    values: ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant']"
+                )
         
         # Validate other parameters
         for param_name, param_config in parameters.items():

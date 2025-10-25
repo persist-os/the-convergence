@@ -1,0 +1,165 @@
+# Azure OpenAI Multi-Model Optimization
+# Simplified configuration with model registry support
+#
+# Required Environment Variables:
+#   AZURE_API_KEY - Azure OpenAI API key (or per-model keys)
+#
+# Setup:
+#   1. Deploy models to Azure AI Foundry
+#   2. export AZURE_API_KEY="your_azure_key"
+#   3. Configure models in api.models registry below
+#   4. Select active model(s) in search_space.parameters.model.values
+#   5. convergence optimize azure_multi_model_optimization.yaml
+
+api:
+  name: "azure_multi_model"
+  description: "Azure OpenAI with multiple models using simplified configuration"
+  
+  # Single API key for all models in the same resource
+  auth:
+    type: "api_key"
+    token_env: "AZURE_API_KEY"
+    header_name: "api-key"
+  
+  # Model registry - all models share the same resource base URL
+  models:
+    gpt-4.1:
+      endpoint: "https://your-resource.openai.azure.com/openai/deployments/gpt-4/chat/completions?api-version=2025-01-01-preview"
+    
+    o4-mini:
+      endpoint: "https://your-resource.openai.azure.com/openai/deployments/o4-mini/chat/completions?api-version=2025-01-01-preview"
+    
+    gpt-4.1-mini:
+      endpoint: "https://your-resource.openai.azure.com/openai/deployments/gpt-4o-mini/chat/completions?api-version=2025-01-01-preview"
+  
+  request:
+    method: "POST"
+    headers:
+      Content-Type: "application/json"
+    timeout_seconds: 120
+
+search_space:
+  parameters:
+    # Model selection - references model registry keys above
+    model:
+      type: "categorical"
+      values:
+        - "gpt-4.1"        # Primary model
+        - "o4-mini"       # Fast reasoning model
+        # - "gpt-4o-mini"  # Cost-effective model
+      description: "Model key from api.models registry"
+    
+    # Temperature - affects response creativity
+    temperature:
+      type: "categorical"
+      values: [0.0, 0.2, 0.4, 0.6, 0.8, 1.0]
+      description: "Sampling temperature"
+    
+    # Max completion tokens
+    max_completion_tokens:
+      type: "discrete"
+      values: [500, 1000, 2000, 4000]
+      description: "Maximum tokens in response"
+
+evaluation:
+  test_cases:
+    path: "azure_test_cases.json"
+    augmentation:
+      enabled: true
+      mutation_rate: 0.3
+      crossover_rate: 0.2
+      augmentation_factor: 2
+      preserve_originals: true
+  
+  metrics:
+    response_quality:
+      weight: 0.4
+      type: "higher_is_better"
+      function: "custom"
+    
+    response_length:
+      weight: 0.2
+      type: "higher_is_better"
+      function: "custom"
+    
+    latency_sec:
+      weight: 0.2
+      type: "lower_is_better"
+      function: "custom"
+    
+    cost_per_task:
+      weight: 0.2
+      type: "lower_is_better"
+      function: "custom"
+  
+  custom_evaluator:
+    enabled: true
+    module: "azure_multi_model_evaluator"
+    function: "score_azure_response"
+
+optimization:
+  algorithm: "mab_evolution"
+  
+  mab:
+    strategy: "thompson_sampling"
+    exploration_rate: 0.2
+    confidence_level: 0.95
+  
+  evolution:
+    generations: 4
+    population_size: 4
+    mutation_rate: 0.25
+    crossover_rate: 0.7
+    elite_size: 1
+  
+  execution:
+    experiments_per_generation: 24
+    parallel_workers: 3
+    max_retries: 3
+    early_stopping:
+      enabled: true
+      patience: 2
+      min_improvement: 0.01
+
+society:
+  enabled: true
+  auto_generate_agents: true
+  learning:
+    rlp_enabled: true
+    sao_enabled: true
+  collaboration:
+    enabled: true
+    trust_threshold: 0.7
+  llm:
+    model: "gemini/gemini-2.0-flash-exp"
+    api_key_env: "GEMINI_API_KEY"
+    temperature: 0.7
+    max_tokens: 1000
+  storage:
+    backend: "multi"
+    path: "./data/optimization"
+    cache_enabled: true
+  weave:
+    enabled: true
+    project: "azure-optimization"
+
+legacy:
+  enabled: true
+  session_id: "azure_multi_model_optimization"
+  tracking_backend: "builtin"
+  sqlite_path: "./data/legacy.db"
+  export_dir: "./legacy_exports"
+  export_formats: ["winners_only", "full_audit"]
+
+output:
+  save_path: "./results/azure_multi_model_optimization"
+  save_all_experiments: true
+  formats: ["json", "markdown", "csv"]
+  visualizations:
+    - "score_over_time"
+    - "parameter_importance"
+    - "cost_vs_quality"
+  export_best_config:
+    enabled: true
+    format: "yaml"
+    output_path: "./best_config.yaml"

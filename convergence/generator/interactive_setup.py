@@ -192,52 +192,140 @@ async def run_guided_setup(project_dir: Path, output_dir: Path) -> Dict[str, Any
         
         # Map choice to provider details
         provider_configs = {
-            "1": {"name": "openai", "endpoint": "https://api.openai.com/v1/chat/completions", "api_key": "OPENAI_API_KEY", "default_models": "gpt-4o-mini, gpt-3.5-turbo"},
-            "2": {"name": "groq", "endpoint": "https://api.groq.com/openai/v1/chat/completions", "api_key": "GROQ_API_KEY", "default_models": "llama-3.3-70b-versatile, llama-3.1-8b-instant"},
-            "3": {"name": "azure", "endpoint": "https://your-resource.openai.azure.com/openai/deployments/your-model/chat/completions", "api_key": "AZURE_OPENAI_API_KEY", "default_models": "gpt-4o, gpt-4o-mini"},
-            "4": {"name": "anthropic", "endpoint": "https://api.anthropic.com/v1/messages", "api_key": "ANTHROPIC_API_KEY", "default_models": "claude-3-haiku, claude-3-sonnet"},
-            "5": {"name": "custom", "endpoint": "https://api.example.com/v1/chat/completions", "api_key": "API_KEY", "default_models": "model1, model2"}
+            "1": {"name": "openai", "endpoint": "https://api.openai.com/v1/chat/completions", "api_key": "OPENAI_API_KEY", "default_models": "gpt-4o-mini, gpt-3.5-turbo", "template": "llm_chat"},
+            "2": {"name": "groq", "endpoint": "https://api.groq.com/openai/v1/chat/completions", "api_key": "GROQ_API_KEY", "default_models": "llama-3.3-70b-versatile, llama-3.1-8b-instant", "template": "llm_chat"},
+            "3": {"name": "azure", "api_key": "AZURE_API_KEY", "default_models": "gpt-4, o4-mini", "template": "azure_chat"},
+            "4": {"name": "anthropic", "endpoint": "https://api.anthropic.com/v1/messages", "api_key": "ANTHROPIC_API_KEY", "default_models": "claude-3-haiku, claude-3-sonnet", "template": "llm_chat"},
+            "5": {"name": "custom", "endpoint": "https://api.example.com/v1/chat/completions", "api_key": "API_KEY", "default_models": "model1, model2", "template": "llm_chat"}
         }
         
         selected_provider = provider_configs[provider_choice]
         provider_name = selected_provider["name"]
-        default_endpoint = selected_provider["endpoint"]
         default_api_key = selected_provider["api_key"]
         default_models = selected_provider["default_models"]
+        template_type = selected_provider["template"]
         
         console.print(f"\n[green]✅ Selected: {provider_name.title()}[/green]")
         console.print("")
         
-        # Endpoint configuration
-        console.print("API Endpoint:")
-        console.print(f"[dim]Default: {default_endpoint}[/dim]")
-        console.print("[dim]You can customize this or skip to use the default.[/dim]")
+        # Azure-specific endpoint collection
+        if provider_name == "azure":
+            console.print("Azure OpenAI requires full endpoint URLs for each model deployment.")
+            console.print("For each model, provide the complete endpoint URL including deployment name and API version.")
+            console.print("")
+            console.print("Example format:")
+            console.print("https://your-resource.openai.azure.com/openai/deployments/gpt-4/chat/completions?api-version=2025-01-01-preview")
+            console.print("")
+            
+            # Collect model names first
+            console.print("Model Names:")
+            console.print(f"[dim]Default: {default_models}[/dim]")
+            console.print("[dim]Enter model names separated by commas.[/dim]")
+            console.print("")
+            models_input = Prompt.ask("Model names (comma-separated)", default=default_models)
+            models = [model.strip() for model in models_input.split(",")]
+            
+            # Collect full endpoint for each model
+            models_with_endpoints = {}
+            console.print("")
+            for model in models:
+                console.print(f"Full endpoint URL for {model}:")
+                endpoint = Prompt.ask(f"Endpoint for {model}")
+                models_with_endpoints[model] = endpoint
+            
+            # Set variables for Azure
+            endpoint = None  # Not used for Azure
+            api_key_env = Prompt.ask("API key env var name", default=default_api_key)
+            
+        else:
+            # Standard endpoint collection for other providers
+            default_endpoint = selected_provider.get("endpoint", "https://api.example.com/v1/chat/completions")
+            
+            # Endpoint configuration
+            console.print("API Endpoint:")
+            console.print(f"[dim]Default: {default_endpoint}[/dim]")
+            console.print("[dim]You can customize this or skip to use the default.[/dim]")
+            console.print("")
+            
+            endpoint = Prompt.ask("API endpoint (or press Enter for default)", default=default_endpoint)
+            
+            # API key environment variable
+            console.print("")
+            console.print(f"[bold yellow]⚠️  Enter the ENVIRONMENT VARIABLE NAME (e.g., {default_api_key})[/bold yellow]")
+            console.print("[dim]NOT the actual API key value! You'll need to export it in your terminal.[/dim]")
+            console.print("")
+            api_key_env = Prompt.ask("API key env var name", default=default_api_key)
+            
+            # Model specification
+            console.print("")
+            console.print("Model Names:")
+            console.print(f"[dim]Default: {default_models}[/dim]")
+            console.print("[dim]Enter model names separated by commas (you can add more later in the YAML).[/dim]")
+            console.print("")
+            models_input = Prompt.ask("Model names (comma-separated)", default=default_models)
+            models = [model.strip() for model in models_input.split(",")]
+            
+            # Set variables for standard providers
+            models_with_endpoints = None
+        
+    elif template_type == "agno_agent":
+        # Agno agents use LLM providers (Azure OpenAI, OpenAI, etc.)
+        console.print("")
+        console.print("[bold]LLM Provider Configuration[/bold]")
+        console.print("")
+        console.print("Agno agents use an underlying LLM provider (Azure OpenAI, OpenAI, etc.)")
         console.print("")
         
-        endpoint = Prompt.ask("API endpoint (or press Enter for default)", default=default_endpoint)
+        # Provider selection
+        console.print("Which LLM provider will your agent use?")
+        console.print("  1. Azure OpenAI")
+        console.print("  2. OpenAI")
+        console.print("  3. Other")
+        console.print("")
+        provider_choice = Prompt.ask("Select provider", choices=["1", "2", "3"], default="1")
+        
+        if provider_choice == "1":
+            provider_name = "azure"
+            default_endpoint = "https://YOUR_RESOURCE.openai.azure.com"
+            default_api_key = "AZURE_API_KEY"
+            default_models = "gpt-4-1, o4-mini"
+        elif provider_choice == "2":
+            provider_name = "openai"
+            default_endpoint = "https://api.openai.com/v1"
+            default_api_key = "OPENAI_API_KEY"
+            default_models = "gpt-4, gpt-3.5-turbo"
+        else:
+            provider_name = "custom"
+            default_endpoint = "https://api.example.com/v1"
+            default_api_key = "LLM_API_KEY"
+            default_models = "model-1"
+        
+        # Endpoint configuration
+        console.print("")
+        console.print("LLM Provider Endpoint:")
+        console.print(f"[dim]Default: {default_endpoint}[/dim]")
+        console.print("")
+        endpoint = Prompt.ask("LLM endpoint (or press Enter for default)", default=default_endpoint)
         
         # API key environment variable
         console.print("")
-        console.print(f"[bold yellow]⚠️  Enter the ENVIRONMENT VARIABLE NAME (e.g., {default_api_key})[/bold yellow]")
-        console.print("[dim]NOT the actual API key value! You'll need to export it in your terminal.[/dim]")
+        console.print(f"[bold yellow]⚠️  Enter the ENVIRONMENT VARIABLE NAME for your LLM provider (e.g., {default_api_key})[/bold yellow]")
+        console.print("[dim]NOT the actual API key value! This is your LLM provider key, NOT an 'Agno API key'.[/dim]")
         console.print("")
-        api_key_env = Prompt.ask("API key env var name", default=default_api_key)
+        api_key_env = Prompt.ask("LLM API key env var name", default=default_api_key)
         
         # Model specification
         console.print("")
-        console.print("Model Names:")
+        console.print("Model/Deployment Names:")
         console.print(f"[dim]Default: {default_models}[/dim]")
-        console.print("[dim]Enter model names separated by commas (you can add more later in the YAML).[/dim]")
+        console.print("[dim]For Azure: use deployment names. For OpenAI: use model names.[/dim]")
         console.print("")
         models_input = Prompt.ask("Model names (comma-separated)", default=default_models)
         models = [model.strip() for model in models_input.split(",")]
         
     else:
-        # Non-LLM Chat APIs use original logic
-        if template_type == "agno_agent":
-            endpoint = "https://api.example.com/v1/agent"
-            default_api_key = "AGNO_API_KEY"
-        elif template_type == "web_automation":
+        # Web automation and other APIs
+        if template_type == "web_automation":
             endpoint = "https://api.browserbase.com/v1/sessions"
             default_api_key = "BROWSERBASE_API_KEY"
         else:
@@ -359,7 +447,12 @@ async def run_guided_setup(project_dir: Path, output_dir: Path) -> Dict[str, Any
     # Generate template using the selected type
     template = generator.templates[template_type]
     
-    config = template.generate_config(endpoint, api_key_env, description, provider_name, models)
+    # Azure uses different config generation
+    if provider_name == "azure":
+        config = template.generate_config(models_with_endpoints, api_key_env, description)
+    else:
+        config = template.generate_config(endpoint, api_key_env, description, provider_name, models)
+    
     test_cases = template.generate_test_cases(description)
     evaluator_code = template.generate_evaluator()
     
@@ -674,10 +767,11 @@ def _get_preset_defaults(template: Dict[str, Any]) -> Dict[str, Any]:
     """Get sensible defaults for preset templates."""
     # Get default API key env var based on template
     template_key_map = {
-        'openai': 'API_KEY',
+        'openai': 'OPENAI_API_KEY',
         'browserbase': 'BROWSERBASE_API_KEY', 
         'groq': 'GROQ_API_KEY',
-        'azure': 'AZURE_OPENAI_API_KEY'
+        'azure': 'AZURE_API_KEY',
+        'reddit': 'AZURE_API_KEY'  # Reddit uses Azure OpenAI
     }
     
     default_key_env = template_key_map.get(template['id'], 'API_KEY')

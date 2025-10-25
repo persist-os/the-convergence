@@ -52,29 +52,20 @@ agent:
     username_env: "REDDIT_USERNAME"
     password_env: "REDDIT_PASSWORD"
   
-  # Model Registry: Define all available models here
+  # Simplified Model Registry: Define all available models here
   # This makes it easy to switch models and manage multiple deployments
   models:
-    gpt-4-1:
-      azure_deployment: "gpt-4.1"
-      azure_endpoint: "https://YOUR_AZURE_OPENAI_RESOURCE.cognitiveservices.azure.com"
-      api_key_env: "AZURE_API_KEY"  # Can use same key or different: "AZURE_API_KEY_GPT4"
-      api_version: "2024-12-01-preview"  # Required for o4-mini; also works for gpt-4.1
-      description: "GPT-4.1 for high-quality responses"
+    gpt-4.1:
+      endpoint: "https://your-resource.openai.azure.com/openai/deployments/gpt-4.1/chat/completions?api-version=2025-01-01-preview"
+      description: "GPT-4 for high-quality responses"
     
     o4-mini:
-      azure_deployment: "o4-mini"
-      azure_endpoint: "https://YOUR_AZURE_OPENAI_RESOURCE.openai.azure.com"
-      api_key_env: "AZURE_API_KEY"
-      api_version: "2024-12-01-preview"  # o4-mini requires 2024-12-01-preview or later
+      endpoint: "https://your-resource.openai.azure.com/openai/deployments/o4-mini/chat/completions?api-version=2025-01-01-preview"
       description: "o4-mini model for fast, cost-effective testing"
     
     # Add more models as you deploy them:
     # gpt-4o-mini:
-    #   azure_deployment: "gpt-4o-mini-deployment"
-    #   azure_endpoint: "https://your-resource.openai.azure.com"
-    #   api_key_env: "AZURE_API_KEY"
-    #   api_version: "2025-01-01-preview"
+    #   endpoint: "https://your-resource.openai.azure.com/openai/deployments/gpt-4o-mini/chat/completions?api-version=2025-01-01-preview"
     #   description: "GPT-4o Mini"
 
 # Search space: Agent parameters to optimize
@@ -87,18 +78,18 @@ search_space:
     model:
       type: "categorical"
       values:
-        - "gpt-4-1"  # Primary model to use
+        - "gpt-4.1"    # Primary model to use
         # Uncomment to test multiple models:
         # - "o4-mini"
         # - "gpt-4o-mini"
       description: "Model key from agent.models registry"
     
     # Temperature - affects reasoning consistency
-    # gpt-4-1 supports full temperature range
+    # gpt-4 supports full temperature range
     temperature:
       type: "categorical"
-      values: [0.0, 0.2, 0.4, 0.6, 0.8, 1.0]  # Full range for gpt-4-1
-      description: "Temperature range for gpt-4-1: 0.0=deterministic, 1.0=creative"
+      values: [0.0, 0.2, 0.4, 0.6, 0.8, 1.0]  # Full range for gpt-4
+      description: "Temperature range for gpt-4: 0.0=deterministic, 1.0=creative"
     
     # Max completion tokens - affects response completeness
     max_completion_tokens:
@@ -226,4 +217,9 @@ legacy:
 society:
   enabled: false  # Disable for initial testing
   # Enable later for RLP/SAO features that can improve agent performance
+  llm:
+    model: "gemini/gemini-2.0-flash-exp"
+    api_key_env: "GEMINI_API_KEY"
+    temperature: 0.7
+    max_tokens: 1000
 
