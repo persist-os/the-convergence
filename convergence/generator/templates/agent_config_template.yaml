@@ -1,0 +1,177 @@
+# {Service} Agent Optimization Configuration Template
+# 
+# Copy this file to your_service/your_agent_optimization.yaml and customize it.
+#
+# This template shows the structure for optimizing agents with different models, temperatures,
+# and instruction styles using the Convergence optimization framework.
+
+api:
+  name: "agno_{service}_agent"
+  description: "Agno agent with {Service} toolkit via Azure OpenAI"
+  endpoint: "https://placeholder"
+  
+  adapter_enabled: true
+  
+  request:
+    method: "POST"
+    headers:
+      Content-Type: "application/json"
+    timeout_seconds: 120
+  
+  auth:
+    type: "api_key"
+    token_env: "AZURE_API_KEY"
+    header_name: "api-key"
+
+# Agent configuration
+agent:
+  # TODO: Replace with your service's authentication section
+  {service}_auth:
+    # Example 1: Simple API key
+    api_key_env: "{SERVICE}_API_KEY"
+    
+    # Example 2: OAuth (uncomment and customize as needed)
+    # client_id_env: "{SERVICE}_CLIENT_ID"
+    # client_secret_env: "{SERVICE}_CLIENT_SECRET"
+    # project_id_env: "{SERVICE}_PROJECT_ID"
+    
+    # Example 3: Token file (uncomment and customize as needed)
+    # token_path: "token.json"
+    # credentials_path: "credentials.json"
+  
+  # Model registry: Define all available models here
+  models:
+    gpt-4:
+      # TODO: Replace with your actual Azure OpenAI endpoint
+      endpoint: "https://your-resource.openai.azure.com/openai/deployments/gpt-4/chat/completions?api-version=2025-01-01-preview"
+      api_key_env: "AZURE_API_KEY"
+      description: "GPT-4 for high-quality responses"
+    
+    gpt-4o-mini:
+      # TODO: Add more models as you deploy them
+      endpoint: "https://your-resource.openai.azure.com/openai/deployments/gpt-4o-mini/chat/completions?api-version=2025-01-01-preview"
+      api_key_env: "AZURE_API_KEY"
+      description: "GPT-4o Mini for cost-effective responses"
+
+# Search space: Agent parameters to optimize
+search_space:
+  parameters:
+    # Model selection - references model registry keys above
+    model:
+      type: "categorical"
+      values: ["gpt-4", "gpt-4o-mini"]
+    
+    # Temperature: Controls randomness (0.0 = deterministic, 1.0 = creative)
+    temperature:
+      type: "categorical"
+      values: [0.2, 0.6, 0.8]
+    
+    # Max tokens: Maximum response length
+    max_completion_tokens:
+      type: "discrete"
+      values: [500, 1000, 2000]
+    
+    # Instruction style: Different prompting strategies
+    instruction_style:
+      type: "categorical"
+      values: ["minimal", "detailed", "structured"]
+    
+    # Tool strategy: Which tools to make available
+    tool_strategy:
+      type: "categorical"
+      values: ["include_all", "include_specific"]
+
+# Evaluation configuration
+evaluation:
+  metrics:
+    accuracy:
+      description: "Correct tool usage and parameter accuracy"
+      weight: 0.4
+    
+    completeness:
+      description: "Data completeness and result coverage"
+      weight: 0.3
+    
+    latency:
+      description: "Response time in seconds"
+      weight: 0.15
+    
+    token_efficiency:
+      description: "Tokens used per unit of information"
+      weight: 0.15
+  
+  test_cases:
+    path: "your_service_test_cases.json"
+  
+  thresholds:
+    accuracy:
+      excellent: 0.95
+      good: 0.85
+      acceptable: 0.70
+    
+    latency:
+      excellent: 1.0
+      good: 2.0
+      acceptable: 5.0
+
+# Optimization settings
+optimization:
+  algorithm: "mab_evolution"
+  
+  mab:
+    strategy: "thompson_sampling"
+    exploration_rate: 0.2
+  
+  evolution:
+    population_size: 3
+    generations: 3
+    mutation_rate: 0.20
+    crossover_rate: 0.40
+    elite_size: 1
+  
+  execution:
+    experiments_per_generation: 12
+    parallel_workers: 1
+    max_retries: 3
+    retry_delay_seconds: 2
+    early_stopping:
+      enabled: true
+      patience: 2
+      min_improvement: 0.01
+
+# Output configuration
+output:
+  save_path: "./results/{service}_agent_optimization"
+  save_all_experiments: true
+  formats: ["json", "markdown", "csv"]
+  
+  visualizations:
+    - "score_over_time"
+    - "parameter_importance"
+    - "cost_vs_quality"
+  
+  export_best_config:
+    enabled: true
+    format: "python"
+    output_path: "./results/best_{service}_agent_config.py"
+
+# Rate limiting (if applicable to your service)
+rate_limiting:
+  enabled: true
+  requests_per_minute: 60
+  burst_limit: 10
+  backoff_strategy: "exponential"
+
+# Legacy tracking (optional)
+legacy:
+  enabled: true
+  session_id: "{service}_agent_optimization"
+  tracking_backend: "builtin"
+  sqlite_path: "./data/{service}_legacy.db"
+  export_dir: "./legacy_exports/{service}"
+  export_formats: ["csv", "json"]
+
+# Agent Society (optional - advanced AI features)
+society:
+  enabled: false
+

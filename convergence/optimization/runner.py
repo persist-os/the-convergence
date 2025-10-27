@@ -37,14 +37,15 @@ try:
     from .adapters.azure import AzureOpenAIAdapter
     from .adapters.gemini import GeminiAdapter
     from .adapters.browserbase import BrowserBaseAdapter
-    from .adapters.agno_reddit import AgnoRedditAdapter
+    # Universal agent adapter - handles ALL Agno agents (Discord, Gmail, Reddit, future agents)
+    from .adapters.agno_agent import UniversalAgentAdapter
     ADAPTERS_AVAILABLE = True
 except ImportError:
     ADAPTERS_AVAILABLE = False
     AzureOpenAIAdapter = None
     GeminiAdapter = None
     BrowserBaseAdapter = None
-    AgnoRedditAdapter = None
+    UniversalAgentAdapter = None
 
 # Weave integration for observability
 try:
@@ -217,12 +218,12 @@ class OptimizationRunner:
         
         api_name_lower = api_name.lower()
         
-        # Check for Agno agent adapters first (they need special handling)
-        if "agno" in api_name_lower and "reddit" in api_name_lower:
-            if AgnoRedditAdapter:
-                return AgnoRedditAdapter(self.config.dict(), config_file_path)
+        # Universal agent adapter - handles ALL Agno agents (Discord, Gmail, Reddit, future agents)
+        if "agno" in api_name_lower:
+            if UniversalAgentAdapter:
+                return UniversalAgentAdapter(self.config.dict(), config_file_path)
             else:
-                console.print("[yellow]⚠️  AgnoRedditAdapter not available[/yellow]")
+                console.print("[yellow]⚠️  UniversalAgentAdapter not available[/yellow]")
                 return None
         
         # Standard API adapters
@@ -941,10 +942,14 @@ class OptimizationRunner:
         """Make API call with retry logic."""
         max_retries = self.config.optimization.execution.max_retries
         
-        # Special handling for Agno adapters - they execute agents instead of HTTP calls
-        if self.adapter and AgnoRedditAdapter and isinstance(self.adapter, AgnoRedditAdapter):
+        # Universal handling for ALL agent adapters
+        is_agent_adapter = (
+            UniversalAgentAdapter and isinstance(self.adapter, UniversalAgentAdapter)
+        ) if self.adapter else False
+        
+        if is_agent_adapter:
             try:
-                # Agno adapter executes the agent and returns result directly
+                # Agent adapter executes the agent and returns result directly
                 result = self.adapter.transform_request(config, test_case)
                 
                 # Transform response format
@@ -960,7 +965,7 @@ class OptimizationRunner:
                     error=result.get('error', None)
                 )
             except Exception as e:
-                error_msg = f"Agno agent execution failed: {str(e)}"
+                error_msg = f"Agent execution failed: {str(e)}"
                 console.print(f"   [red]❌ {error_msg}[/red]")
                 return APIResponse(
                     success=False,

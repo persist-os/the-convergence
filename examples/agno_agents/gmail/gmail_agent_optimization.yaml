@@ -1,0 +1,145 @@
+# Example Gmail Agent Configuration 
+
+api:
+  name: "agno_gmail_agent"
+  description: "Agno agent with Gmail toolkit via Azure OpenAI"
+  endpoint: "https://placeholder-see-agent-models-registry"
+  
+  adapter_enabled: true
+  
+  request:
+    method: "POST"
+    headers:
+      Content-Type: "application/json"
+    timeout_seconds: 120
+  
+  auth:
+    type: "api_key"
+    token_env: "AZURE_API_KEY"
+    header_name: "api-key"
+
+# Agent configuration
+agent:
+  # Gmail API authentication
+  gmail_auth:
+    client_id_env: "GOOGLE_CLIENT_ID"
+    client_secret_env: "GOOGLE_CLIENT_SECRET"
+    project_id_env: "GOOGLE_PROJECT_ID"
+    token_env: "GMAIL_TOKEN" 
+  
+  # Simplified Model Registry
+  models:
+    gpt-4.1:
+      # Replace with your actual Azure OpenAI endpoint
+      # Get this from: https://portal.azure.com > Your OpenAI resource
+      endpoint: "https://heycontext-resource.cognitiveservices.azure.com/openai/deployments/gpt-4.1/chat/completions?api-version=2025-01-01-preview"
+      description: "GPT-4 for high-quality responses"
+
+# Search space: Agent parameters to optimize
+search_space:
+  parameters:
+    model:
+      type: "categorical"
+      values: ["gpt-4.1"]
+    
+    temperature:
+      type: "categorical"
+      values: [0.2, 0.6]
+    
+    max_completion_tokens:
+      type: "discrete"
+      values: [1000, 2000]
+    
+    instruction_style:
+      type: "categorical"
+      values: ["detailed"]
+    
+    tool_strategy:
+      type: "categorical"
+      values: ["include_all"]
+
+# Evaluation configuration
+evaluation:
+  test_cases:
+    path: "./gmail_test_cases.json"
+  
+  metrics:
+    accuracy:
+      weight: 0.40
+      type: "higher_is_better"
+      function: "custom"
+    
+    completeness:
+      weight: 0.30
+      type: "higher_is_better"
+      function: "custom"
+    
+    latency_seconds:
+      weight: 0.20
+      type: "lower_is_better"
+    
+    token_efficiency:
+      weight: 0.10
+      type: "higher_is_better"
+      function: "custom"
+  
+  custom_evaluator:
+    enabled: true
+    module: "gmail_evaluator"
+    function: "score_gmail_agent_response"
+
+# Optimization settings
+optimization:
+  algorithm: "mab_evolution"
+  
+  mab:
+    strategy: "thompson_sampling"
+    exploration_rate: 0.2
+  
+  evolution:
+    population_size: 1
+    generations: 1
+    mutation_rate: 0.20
+    crossover_rate: 0.40
+    elite_size: 1
+  
+  execution:
+    experiments_per_generation: 1
+    parallel_workers: 1
+    max_retries: 3
+    retry_delay_seconds: 2
+    early_stopping:
+      enabled: true
+      patience: 2
+      min_improvement: 0.01
+
+# Output configuration
+output:
+  save_path: "./results/gmail_agent_optimization"
+  save_all_experiments: true
+  formats: ["json", "markdown", "csv"]
+  
+  visualizations:
+    - "score_over_time"
+    - "parameter_importance"
+  
+  export_best_config:
+    enabled: true
+    format: "python"
+    output_path: "./results/best_gmail_agent_config.py"
+
+# Rate limiting for Gmail API
+rate_limiting:
+  enabled: true
+  requests_per_minute: 50
+  burst_limit: 10
+  backoff_strategy: "exponential"
+
+# Legacy tracking
+legacy:
+  enabled: true
+  session_id: "gmail_agent_optimization"
+  tracking_backend: "builtin"
+  sqlite_path: "./data/gmail_legacy.db"
+  export_dir: "./legacy_exports/gmail"
+  export_formats: ["csv", "json"]

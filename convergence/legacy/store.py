@@ -51,9 +51,9 @@ class LegacyStore:
         self.db_path = Path(config.sqlite_path)
         self.export_dir = Path(config.export_dir)
         
-        # Ensure directories exist
+        # Ensure database directory exists (needed for SQLite)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        self.export_dir.mkdir(parents=True, exist_ok=True)
+        # Export directory created lazily when needed (no unnecessary folders)
         
         # Optional external tracker (Future: MLflow, Aim, Weave)
         self.tracker = None
@@ -514,6 +514,9 @@ class LegacyStore:
         Returns:
             Path to exported CSV file
         """
+        # Create export directory lazily when actually exporting
+        self.export_dir.mkdir(parents=True, exist_ok=True)
+        
         output_path = self.export_dir / f"winners_{api_name or 'all'}.csv"
         
         # Query winners
@@ -559,6 +562,9 @@ class LegacyStore:
         Returns:
             Path to exported CSV file
         """
+        # Create export directory lazily when actually exporting
+        self.export_dir.mkdir(parents=True, exist_ok=True)
+        
         output_path = self.export_dir / f"audit_{session_id or 'all'}.csv"
         
         # Query test case results with run info

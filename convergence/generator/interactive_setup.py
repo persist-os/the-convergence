@@ -112,8 +112,9 @@ async def run_preset_template_setup(project_dir: Path, output_dir: Path) -> Dict
     console.print("[dim]• Legacy system enabled for continuous learning[/dim]")
     console.print("")
     
-    # Use sensible defaults instead of asking detailed questions
-    config_overrides = _get_preset_defaults(selected_template)
+    # For preset templates, don't apply any overrides - just copy the files as-is
+    # The working examples already have correct configuration
+    config_overrides = {}  # No overrides for preset templates
     
     # Step 3: Agent Society (Use defaults for presets)
     console.print("")
@@ -771,7 +772,9 @@ def _get_preset_defaults(template: Dict[str, Any]) -> Dict[str, Any]:
         'browserbase': 'BROWSERBASE_API_KEY', 
         'groq': 'GROQ_API_KEY',
         'azure': 'AZURE_API_KEY',
-        'reddit': 'AZURE_API_KEY'  # Reddit uses Azure OpenAI
+        'reddit': 'AZURE_API_KEY',   # All agent templates use Azure OpenAI
+        'gmail': 'AZURE_API_KEY',    # All agent templates use Azure OpenAI
+        'discord': 'AZURE_API_KEY'   # All agent templates use Azure OpenAI
     }
     
     default_key_env = template_key_map.get(template['id'], 'API_KEY')

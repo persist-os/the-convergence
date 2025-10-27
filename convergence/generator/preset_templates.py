@@ -52,6 +52,20 @@ def list_available_templates() -> List[Dict[str, Any]]:
             "description": "Optimize Reddit data retrieval agents with Azure OpenAI",
             "features": ["4 test cases", "Custom evaluator", "MAB optimization", "Azure model registry"],
             "test_count": 4
+        },
+        {
+            "id": "gmail",
+            "name": "Gmail Agent (Agno + Azure)",
+            "description": "Optimize email management agents with Gmail API and Azure OpenAI",
+            "features": ["5 test cases", "Custom evaluator", "MAB optimization", "Azure model registry"],
+            "test_count": 5
+        },
+        {
+            "id": "discord",
+            "name": "Discord Agent (Agno + Azure)",
+            "description": "Optimize Discord bot agents with Discord API and Azure OpenAI",
+            "features": ["5 test cases", "Custom evaluator", "MAB optimization", "Azure model registry"],
+            "test_count": 5
         }
     ]
 
@@ -108,6 +122,20 @@ async def create_preset_config(
             "evaluator": "agno_agents/reddit/reddit_evaluator.py",
             "runner": "agno_agents/reddit/reddit_agent_runner.py",
             "name": "Reddit Agent"
+        },
+        "gmail": {
+            "config": "agno_agents/gmail/gmail_agent_optimization.yaml",
+            "tests": "agno_agents/gmail/gmail_test_cases.json",
+            "evaluator": "agno_agents/gmail/gmail_evaluator.py",
+            "runner": "agno_agents/gmail/gmail_agent_runner.py",
+            "name": "Gmail Agent"
+        },
+        "discord": {
+            "config": "agno_agents/discord/discord_agent_optimization.yaml",
+            "tests": "agno_agents/discord/discord_test_cases.json",
+            "evaluator": "agno_agents/discord/discord_evaluator.py",
+            "runner": "agno_agents/discord/discord_agent_runner.py",
+            "name": "Discord Agent"
         }
     }
     
@@ -125,16 +153,36 @@ async def create_preset_config(
     source_tests = convergence_root / "examples" / template["tests"]
     source_evaluator = convergence_root / "examples" / template["evaluator"]
     
-    # Optional runner file (for Reddit template)
+    # Optional runner file (for agent templates: Reddit, Gmail, Discord)
     source_runner = None
     if "runner" in template:
         source_runner = convergence_root / "examples" / template["runner"]
+    
+    # Base agent runner for agent templates (Discord, Gmail, Reddit)
+    source_base_runner = None
+    if preset_name in ["reddit", "gmail", "discord"]:
+        source_base_runner = convergence_root / "examples" / "agno_agents" / "base_agent_runner.py"
     
     # Destination files
     config_path = output_dir / "optimization.yaml"
     tests_path = output_dir / "test_cases.json"
     evaluator_path = output_dir / "evaluator.py"
-    runner_path = output_dir / "reddit_agent_runner.py" if source_runner else None
+    
+    # Determine runner filename based on preset
+    if source_runner:
+        if preset_name == "reddit":
+            runner_path = output_dir / "reddit_agent_runner.py"
+        elif preset_name == "gmail":
+            runner_path = output_dir / "gmail_agent_runner.py"
+        elif preset_name == "discord":
+            runner_path = output_dir / "discord_agent_runner.py"
+        else:
+            runner_path = output_dir / "agent_runner.py"
+    else:
+        runner_path = None
+    
+    # Base runner path for agent templates
+    base_runner_path = output_dir / "base_agent_runner.py" if source_base_runner else None
     
     # Verify source files exist
     if not source_config.exists():
@@ -148,11 +196,12 @@ async def create_preset_config(
     # Update test cases path
     config_content = _update_config_paths(config_content, preset_name)
     
-    # Apply user configuration overrides
-    if config_overrides:
+    # Apply user configuration overrides (only if explicitly provided)
+    # Note: For preset templates, config_overrides is empty {} to preserve original config
+    if config_overrides and len(config_overrides) > 0:
         config_content = _apply_config_overrides(config_content, config_overrides)
     
-    # Inject society config if provided
+    # Inject society config if provided and enabled
     if society_config and society_config.get("enabled"):
         config_content = _inject_society_config(config_content, society_config)
     
@@ -169,11 +218,30 @@ async def create_preset_config(
         shutil.copy2(source_evaluator, evaluator_path)
         evaluator_copied = True
     
-    # Copy runner if it exists (for Reddit template)
+    # Copy runner if it exists (for agent templates)
     runner_copied = False
     if source_runner and source_runner.exists():
-        shutil.copy2(source_runner, runner_path)
+        runner_content = source_runner.read_text()
+        
+        # Update import to use local base_agent_runner instead of parent directory
+        if preset_name in ["reddit", "gmail", "discord"]:
+            # Replace the parent directory import with local import
+            import re
+            # Pattern to match the sys.path.insert and import lines
+            runner_content = re.sub(
+                r"sys\.path\.insert\(0, os\.path\.join\(os\.path\.dirname\(__file__\), '\.\.'\)\)\s*\nfrom base_agent_runner import BaseAgentRunner",
+                "from base_agent_runner import BaseAgentRunner",
+                runner_content
+            )
+        
+        runner_path.write_text(runner_content)
         runner_copied = True
+    
+    # Copy base runner for agent templates
+    base_runner_copied = False
+    if source_base_runner and source_base_runner.exists():
+        shutil.copy2(source_base_runner, base_runner_path)
+        base_runner_copied = True
     
     # Create data directory structure
     (output_dir / "data").mkdir(exist_ok=True)
@@ -190,6 +258,8 @@ async def create_preset_config(
         console.print(f"✅ Copied custom evaluator")
     if runner_copied:
         console.print(f"✅ Copied agent runner")
+    if base_runner_copied:
+        console.print(f"✅ Copied base agent runner")
     console.print("")
     console.print("🎉 [bold green]Template ready![/bold green]")
     console.print("")
@@ -205,6 +275,7 @@ async def create_preset_config(
         'tests_path': str(tests_path),
         'evaluator_path': str(evaluator_path) if source_evaluator.exists() else None,
         'runner_path': str(runner_path) if runner_copied else None,
+        'base_runner_path': str(base_runner_path) if base_runner_copied else None,
         'test_cases': test_cases.get('test_cases', []) if isinstance(test_cases, dict) else test_cases,
         'config': {},
         'elapsed': 0.1
@@ -259,6 +330,16 @@ def _update_config_paths(config_content: str, preset_name: str) -> str:
         replacements.extend([
             ('path: "reddit_test_cases.json"', 'path: "test_cases.json"'),
             ('module: "reddit_evaluator"', 'module: "evaluator"'),
+        ])
+    elif preset_name == "gmail":
+        replacements.extend([
+            ('path: "gmail_test_cases.json"', 'path: "test_cases.json"'),
+            ('module: "gmail_evaluator"', 'module: "evaluator"'),
+        ])
+    elif preset_name == "discord":
+        replacements.extend([
+            ('path: "discord_test_cases.json"', 'path: "test_cases.json"'),
+            ('module: "discord_evaluator"', 'module: "evaluator"'),
         ])
     
     # Apply all replacements

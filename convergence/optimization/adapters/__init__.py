@@ -13,6 +13,7 @@ Available Adapters:
 - AzureOpenAIAdapter: Azure-specific auth and endpoints
 - GeminiAdapter: Google Gemini's nested request/response structure
 - BrowserBaseAdapter: Browser automation session API
+- UniversalAgentAdapter: Universal adapter for all Agno agent implementations (Discord, Gmail, Reddit, etc.)
 
 To add a new adapter:
 1. Create adapter file in this directory

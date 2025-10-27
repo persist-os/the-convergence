@@ -1,0 +1,219 @@
+{
+  "test_cases": [
+    {
+      "id": "list_server_channels",
+      "function": "list_channels",
+      "description": "List all channels in a Discord server",
+      "input": {
+        "query": "List all channels in my Discord server",
+        "guild_id": "1342350434794213386"
+      },
+      "expected": {
+        "tools_called": ["list_channels"],
+        "tool_sequence": [
+          {
+            "tool": "list_channels",
+            "params": {
+              "guild_id": "1342350434794213386"
+            }
+          }
+        ],
+        "result_validation": {
+          "schema": {
+            "type": "array",
+            "items": {
+              "required_fields": ["id", "name", "type"],
+              "optional_fields": ["topic", "position", "nsfw"]
+            }
+          },
+          "data_checks": {
+            "has_channels": true,
+            "min_channels": 1,
+            "has_channel_ids": true,
+            "has_channel_names": true
+          },
+          "keywords": {
+            "required_in_response": ["channels", "server"],
+            "match_type": "case_insensitive",
+            "min_matches": 1
+          }
+        },
+        "success_criteria": {
+          "tools_called_correctly": true,
+          "tool_sequence_logical": true,
+          "valid_response_format": true,
+          "data_completeness_percent": 80,
+          "comprehensive_output": true
+        }
+      },
+      "metadata": {
+        "category": "integration_test",
+        "difficulty": "easy",
+        "estimated_tokens": 400,
+        "weight": 1.0,
+        "note": "Agent must use list_channels tool with correct guild_id"
+      }
+    },
+    {
+      "id": "get_channel_info",
+      "function": "get_channel_info",
+      "description": "Get information about a specific Discord channel",
+      "input": {
+        "query": "Get information about channel #general-comms",
+        "channel_id": "1371294820097851402"
+      },
+      "expected": {
+        "tools_called": ["get_channel_info"],
+        "tool_sequence": [
+          {
+            "tool": "get_channel_info",
+            "params": {
+              "channel_id": "987654321098765432"
+            }
+          }
+        ],
+        "result_validation": {
+          "schema": {
+            "type": "object",
+            "required_fields": ["id", "name", "type", "guild_id"],
+            "optional_fields": ["topic", "position", "nsfw", "member_count"]
+          },
+          "data_checks": {
+            "has_channel_id": true,
+            "has_channel_name": true,
+            "has_channel_type": true,
+            "channel_id_matches": true
+          },
+          "keywords": {
+            "required_in_response": ["channel", "info"],
+            "match_type": "case_insensitive",
+            "min_matches": 1
+          }
+        },
+        "success_criteria": {
+          "tools_called_correctly": true,
+          "tool_sequence_logical": true,
+          "valid_response_format": true,
+          "data_completeness_percent": 85,
+          "accurate_channel_info": true
+        }
+      },
+      "metadata": {
+        "category": "integration_test",
+        "difficulty": "easy",
+        "estimated_tokens": 400,
+        "weight": 1.0,
+        "note": "Agent must use get_channel_info tool with correct channel_id"
+      }
+    },
+    {
+      "id": "get_channel_messages",
+      "function": "get_channel_messages",
+      "description": "Fetch recent messages from a Discord channel",
+      "input": {
+        "query": "Get the last 10 messages from #general-comms",
+        "channel_id": "1371294820097851402",
+        "limit": 10
+      },
+      "expected": {
+        "tools_called": ["get_channel_messages"],
+        "tool_sequence": [
+          {
+            "tool": "get_channel_messages",
+            "params": {
+              "channel_id": "1371294820097851402",
+              "limit": 10
+            }
+          }
+        ],
+        "result_validation": {
+          "schema": {
+            "type": "array",
+            "items": {
+              "required_fields": ["id", "content", "author", "timestamp"],
+              "optional_fields": ["attachments", "reactions", "mentions"]
+            }
+          },
+          "data_checks": {
+            "has_messages": true,
+            "has_message_content": true,
+            "has_message_author": true,
+            "message_count_reasonable": true
+          },
+          "keywords": {
+            "required_in_response": ["messages", "channel"],
+            "match_type": "case_insensitive",
+            "min_matches": 1
+          }
+        },
+        "success_criteria": {
+          "tools_called_correctly": true,
+          "tool_sequence_logical": true,
+          "valid_response_format": true,
+          "data_completeness_percent": 80,
+          "messages_displayed": true
+        }
+      },
+      "metadata": {
+        "category": "integration_test",
+        "difficulty": "medium",
+        "estimated_tokens": 600,
+        "weight": 1.5,
+        "note": "Agent must use get_channel_messages with correct parameters"
+      }
+    },
+    {
+      "id": "send_message_workflow",
+      "function": "multiple",
+      "description": "Send a message to apologizing for the testing spam",
+      "input": {
+        "query": "Send a message to apologizing for the testing spam",
+        "channel_id": "1371294820097851402"
+      },
+      "expected": {
+        "tools_called": ["send_message"],
+        "tool_sequence": [
+          {
+            "tool": "send_message",
+            "params": {
+              "channel_id": "1371294820097851402"
+            }
+          }
+        ],
+        "result_validation": {
+          "schema": {
+            "type": "object",
+            "required_fields": ["success"],
+            "optional_fields": ["message_id", "channel_id"]
+          },
+          "data_checks": {
+            "message_sent": true,
+            "message_contains_mention": true,
+            "message_content_generated": true
+          },
+          "keywords": {
+            "required_in_response": ["message", "sent", "success"],
+            "match_type": "case_insensitive",
+            "min_matches": 2
+          }
+        },
+        "success_criteria": {
+          "tools_called_correctly": true,
+          "tool_sequence_logical": true,
+          "valid_response_format": true,
+          "data_completeness_percent": 90,
+          "message_sent_successfully": true,
+          "user_mentioned_correctly": true,
+          "message_is_playful_but_direct": true
+        }
+      },
+      "metadata": {
+        "category": "integration_test",
+        "difficulty": "easy",
+        "estimated_tokens": 500,
+        "weight": 1.0,
+        "note": "Agent must use send_message tool with correct channel_id and message"
+      }
+    }
+  ]
+}

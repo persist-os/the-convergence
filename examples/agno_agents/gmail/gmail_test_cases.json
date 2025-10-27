@@ -1,0 +1,21 @@
+{
+  "test_cases": [
+    {
+      "id": "simple_email_check",
+      "function": "get_unread_emails",
+      "description": "Simple unread email check",
+      "input": {
+        "query": "Get unread emails"
+      },
+      "expected": {
+        "tools_called": ["get_unread_emails"]
+      },
+      "metadata": {
+        "category": "unit_test",
+        "difficulty": "easy",
+        "estimated_tokens": 200
+      }
+    }
+  ]
+}
+

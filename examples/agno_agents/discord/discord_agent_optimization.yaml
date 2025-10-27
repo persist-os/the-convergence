@@ -1,0 +1,203 @@
+# Agno Discord Agent Optimization with Azure OpenAI
+# Tests Discord toolkit workflows across different agent configurations
+# Focus: Real-world workflows using actual DiscordTools functions
+#
+# Required Environment Variables:
+#   DISCORD_BOT_TOKEN - Discord bot token from Discord Developer Portal
+#   AZURE_API_KEY - Azure OpenAI API key (or per-model keys)
+#
+# Setup:
+#   1. Create a Discord application: https://discord.com/developers/applications
+#   2. Create a bot and copy the bot token
+#   3. Invite the bot to your server (requires bot and messages.read permissions)
+#   4. export DISCORD_BOT_TOKEN="your_bot_token"
+#   5. Deploy models to Azure AI Foundry
+#   6. export AZURE_API_KEY="your_azure_key"
+#   7. Configure models in agent.models registry below
+#   8. Select active model(s) in search_space.parameters.model.values
+#   9. Update channel_id and guild_id in test cases to match your server
+#   10. convergence optimize discord_agent_optimization.yaml
+
+api:
+  name: "agno_discord_agent"
+  description: "Agno agent with Discord toolkit via Azure OpenAI"
+  endpoint: "https://placeholder-see-agent-models-registry"
+  
+  adapter_enabled: true  # Enable AgnoDiscordAdapter for agent execution
+  
+  request:
+    method: "POST"
+    headers:
+      Content-Type: "application/json"
+    timeout_seconds: 120  # Discord API + LLM processing can take time
+  
+  auth:
+    type: "api_key"
+    token_env: "AZURE_API_KEY"
+    header_name: "api-key"  # Azure uses 'api-key' header
+
+# Agent configuration
+agent:
+  # Discord bot authentication
+  discord_auth:
+    bot_token_env: "DISCORD_BOT_TOKEN"
+  
+  # Simplified Model Registry: Define all available models here
+  models:
+    gpt-4.1:
+      endpoint: "https://heycontext-resource.cognitiveservices.azure.com/openai/deployments/gpt-4.1/chat/completions?api-version=2025-01-01-preview"
+      description: "GPT-4 for high-quality responses"
+    
+    o4-mini:
+      endpoint: "https://heycontext-resource.cognitiveservices.azure.com/openai/deployments/o4-mini/chat/completions?api-version=2025-01-01-preview"
+      description: "o4-mini model for fast, cost-effective testing"
+
+# Search space: Agent parameters to optimize
+search_space:
+  parameters:
+    # Model selection - references model registry keys above
+    model:
+      type: "categorical"
+      values:
+        - "gpt-4.1"    # Primary model to use
+        # Uncomment to test multiple models:
+        # - "o4-mini"
+      description: "Model key from agent.models registry"
+    
+    # Temperature - affects reasoning consistency
+    temperature:
+      type: "categorical"
+      values: [0.0, 0.2, 0.4, 0.6, 0.8, 1.0]
+      description: "Temperature range: 0.0=deterministic, 1.0=creative"
+    
+    # Max completion tokens - affects response completeness
+    max_completion_tokens:
+      type: "discrete"
+      values: [500, 1000, 2000, 4000]
+      description: "Max tokens for agent response"
+    
+    # Instruction strategy - different prompting approaches
+    instruction_style:
+      type: "categorical"
+      values:
+        - "minimal"       # Brief: "You are a Discord assistant"
+        - "detailed"      # Explicit: Step-by-step guidance
+        - "structured"     # Formatted: Require specific output format
+      description: "Agent instruction/prompting style"
+    
+    # Tool selection strategy
+    tool_strategy:
+      type: "categorical"
+      values:
+        - "include_all"       # All Discord tools available
+        - "include_specific"  # Focused subset for specific workflows
+      description: "Tool selection strategy"
+
+# Evaluation configuration
+evaluation:
+  # Test cases
+  test_cases:
+    path: "discord_test_cases.json"
+    augmentation:
+      enabled: false
+  
+  # Metrics with weights
+  metrics:
+    accuracy:
+      weight: 0.40
+      type: "higher_is_better"
+      function: "custom"
+      description: "Tool usage correctness and result relevance"
+    completeness:
+      weight: 0.30
+      type: "higher_is_better"
+      function: "custom"
+      description: "Data field presence and population"
+    latency_seconds:
+      weight: 0.20
+      type: "lower_is_better"
+      description: "Response time for agent execution"
+    token_efficiency:
+      weight: 0.10
+      type: "higher_is_better"
+      function: "custom"
+      description: "Value per token used"
+  
+  # Custom evaluator
+  custom_evaluator:
+    enabled: true
+    module: "discord_evaluator"
+    function: "score_discord_agent_response"
+
+# Optimization algorithm configuration
+optimization:
+  algorithm: "evolution"  # Use genetic algorithm
+  
+  execution:
+    parallel_workers: 1  # Sequential for Discord API rate limits
+    experiments_per_generation: 2
+    max_retries: 2
+    early_stopping:
+      enabled: true
+      patience: 3
+      min_improvement: 0.001
+  
+  evolution:
+    population_size: 1
+    generations: 1
+    mutation_rate: 0.15
+    crossover_rate: 0.7
+    elite_size: 2
+
+# Output configuration
+output:
+  save_path: "./results/discord_agent_optimization"
+  save_all_experiments: true
+  formats: ["json", "markdown", "csv"]
+  
+  visualizations:
+    - "score_over_time"
+    - "parameter_importance"
+    - "cost_vs_quality"
+  
+  export_best_config:
+    enabled: true
+    format: "python"
+    output_path: "./results/best_discord_agent_config.py"
+
+# Legacy tracking
+legacy:
+  enabled: true
+  session_id: "discord_agent_optimization"
+  tracking_backend: "builtin"
+  sqlite_path: "./data/discord_optimization.db"
+  export_dir: "./data/exports"
+  export_formats:
+    - "winners_only"
+    - "full_audit"
+  
+  mlflow_config:
+    enabled: false
+  
+  aim_config:
+    enabled: false
+  
+  weave_config:
+    enabled: false
+
+# Agent society (RLP + SAO) - optional
+society:
+  enabled: false  # Set to true for advanced learning
+  auto_generate_agents: true
+  
+  llm:
+    model: "gemini/gemini-2.0-flash-exp"
+    api_key_env: "GEMINI_API_KEY"
+  
+  learning:
+    rlp_enabled: false  # Reinforcement Learning on Policy
+    sao_enabled: false  # Self-Alignment Optimization
+  
+  storage:
+    backend: "multi"
+    path: "./data/discord_society"

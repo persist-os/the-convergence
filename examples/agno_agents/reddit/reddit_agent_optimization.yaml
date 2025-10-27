@@ -56,11 +56,11 @@ agent:
   # This makes it easy to switch models and manage multiple deployments
   models:
     gpt-4.1:
-      endpoint: "https://your-resource.openai.azure.com/openai/deployments/gpt-4.1/chat/completions?api-version=2025-01-01-preview"
+      endpoint: "https://heycontext-resource.cognitiveservices.azure.com/openai/deployments/gpt-4.1/chat/completions?api-version=2025-01-01-preview"
       description: "GPT-4 for high-quality responses"
     
     o4-mini:
-      endpoint: "https://your-resource.openai.azure.com/openai/deployments/o4-mini/chat/completions?api-version=2025-01-01-preview"
+      endpoint: "https://heycontext-resource.cognitiveservices.azure.com/openai/deployments/o4-mini/chat/completions?api-version=2025-01-01-preview"
       description: "o4-mini model for fast, cost-effective testing"
     
     # Add more models as you deploy them:
