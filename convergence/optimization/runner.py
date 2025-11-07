@@ -8,7 +8,7 @@ import asyncio
 import json
 import os
 import time
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Callable
 from pathlib import Path
 from datetime import datetime
 from multiprocessing import Pool
@@ -39,6 +39,8 @@ try:
     from .adapters.browserbase import BrowserBaseAdapter
     # Universal agent adapter - handles ALL Agno agents (Discord, Gmail, Reddit, future agents)
     from .adapters.agno_agent import UniversalAgentAdapter
+    # Local function adapter - for optimizing internal Python functions
+    from .adapters.local_function import LocalFunctionAdapter
     ADAPTERS_AVAILABLE = True
 except ImportError:
     ADAPTERS_AVAILABLE = False
@@ -46,6 +48,7 @@ except ImportError:
     GeminiAdapter = None
     BrowserBaseAdapter = None
     UniversalAgentAdapter = None
+    LocalFunctionAdapter = None
 
 # Weave integration for observability
 try:
@@ -68,13 +71,19 @@ class OptimizationRunner:
     - Progress tracking and early stopping
     """
     
-    def __init__(self, config: OptimizationSchema, config_file_path: Optional[Path] = None):
+    def __init__(
+        self, 
+        config: OptimizationSchema, 
+        config_file_path: Optional[Path] = None,
+        custom_evaluator_callable: Optional[Callable] = None
+    ):
         """
         Initialize optimization runner.
         
         Args:
             config: Complete optimization configuration
             config_file_path: Path to the config file (for loading local evaluators)
+            custom_evaluator_callable: Optional callable evaluator (SDK programmatic mode)
         """
         self.config = config
         self.config_file_path = config_file_path
@@ -92,7 +101,11 @@ class OptimizationRunner:
         
         # Initialize components
         self.api_caller = APICaller(timeout=config.api.request.timeout_seconds)
-        self.evaluator = Evaluator(config.evaluation, config_file_path=config_file_path)
+        self.evaluator = Evaluator(
+            config.evaluation, 
+            config_file_path=config_file_path,
+            custom_evaluator_callable=custom_evaluator_callable
+        )
         
         # Initialize API adapter based on provider
         # OpenAI-compatible providers (OpenAI, Groq, Anthropic) use default behavior
@@ -217,6 +230,23 @@ class OptimizationRunner:
             return None
         
         api_name_lower = api_name.lower()
+        
+        # Local function adapter - for internal function optimization
+        if api_name_lower.startswith("local_"):
+            if LocalFunctionAdapter:
+                # Extract function from config metadata or name
+                # Config should have func or func_path in metadata
+                func = getattr(self.config, 'local_function', None)
+                func_path = getattr(self.config, 'local_function_path', None)
+                
+                if func or func_path:
+                    return LocalFunctionAdapter(func=func, func_path=func_path)
+                else:
+                    console.print("[yellow]⚠️  LocalFunctionAdapter needs func or func_path[/yellow]")
+                    return None
+            else:
+                console.print("[yellow]⚠️  LocalFunctionAdapter not available[/yellow]")
+                return None
         
         # Universal agent adapter - handles ALL Agno agents (Discord, Gmail, Reddit, future agents)
         if "agno" in api_name_lower:
@@ -942,14 +972,19 @@ class OptimizationRunner:
         """Make API call with retry logic."""
         max_retries = self.config.optimization.execution.max_retries
         
+        # Universal handling for local function adapters
+        is_local_function_adapter = (
+            LocalFunctionAdapter and isinstance(self.adapter, LocalFunctionAdapter)
+        ) if self.adapter else False
+        
         # Universal handling for ALL agent adapters
         is_agent_adapter = (
             UniversalAgentAdapter and isinstance(self.adapter, UniversalAgentAdapter)
         ) if self.adapter else False
         
-        if is_agent_adapter:
+        if is_local_function_adapter or is_agent_adapter:
             try:
-                # Agent adapter executes the agent and returns result directly
+                # Adapter executes function and returns result directly
                 result = self.adapter.transform_request(config, test_case)
                 
                 # Transform response format
@@ -959,13 +994,13 @@ class OptimizationRunner:
                 latency_ms = result.get('latency_seconds', 0.0) * 1000
                 
                 return APIResponse(
-                    success=True,
-                    result=result,
+                    success=result.get('success', True),
+                    result=result.get('result'),
                     latency_ms=latency_ms,
-                    error=result.get('error', None)
+                    error=result.get('error')
                 )
             except Exception as e:
-                error_msg = f"Agent execution failed: {str(e)}"
+                error_msg = f"{'Local function' if is_local_function_adapter else 'Agent'} execution failed: {str(e)}"
                 console.print(f"   [red]❌ {error_msg}[/red]")
                 return APIResponse(
                     success=False,

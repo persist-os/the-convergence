@@ -259,6 +259,73 @@ python run_groq_optimization.py
 - **Metrics**: Define custom evaluators for domain-specific scoring
 - **Parallel Workers**: Set to 1 for sequential evaluation (simpler debugging)
 
+## Runtime Loop (Per-Request Bandit)
+
+```python
+from convergence import (
+    configure_runtime,
+    runtime_select,
+    runtime_update,
+    RuntimeConfigSDK,
+)
+from my_app.runtime_storage import MyRuntimeStorage
+
+config = RuntimeConfigSDK(
+    system="context_enrichment",
+    agent_type="chat",
+    default_arms=[
+        {
+            "arm_id": "balanced",
+            "name": "Balanced",
+            "params": {"threshold": 0.35, "limit": 5},
+        }
+    ],
+)
+
+storage = MyRuntimeStorage()
+await configure_runtime("context_enrichment", config=config, storage=storage)
+
+selection = await runtime_select(
+    "context_enrichment",
+    user_id="user_123",
+    context={"conversation_id": "conv_456"},
+)
+
+# Use selection.params in your application logic
+await runtime_update(
+    "context_enrichment",
+    user_id="user_123",
+    decision_id=selection.decision_id or "",
+    reward=0.8,
+)
+```
+
+Implement `RuntimeStorageProtocol` in your backend to persist arms and decisions:
+
+```python
+from convergence.storage.runtime_protocol import RuntimeStorageProtocol
+
+class MyRuntimeStorage(RuntimeStorageProtocol):
+    async def get_arms(self, *, user_id: str, agent_type: str):
+        ...
+
+    async def initialize_arms(self, *, user_id: str, agent_type: str, arms):
+        ...
+
+    async def create_decision(self, *, user_id: str, agent_type: str, arm_pulled: str,
+                              strategy_params, arms_snapshot, metadata=None):
+        ...
+
+    async def update_performance(self, *, user_id: str, agent_type: str, decision_id: str,
+                                 reward: float, engagement=None, grading=None, metadata=None):
+        ...
+
+    async def get_decision(self, *, user_id: str, decision_id: str):
+        ...
+```
+
+See `convergence/storage/runtime_protocol.py` for complete method signatures.
+
 ## Advanced Usage
 
 ### Custom Evaluator

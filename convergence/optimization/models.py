@@ -313,9 +313,15 @@ class RedditAuthConfig(BaseModel):
     password_env: Optional[str] = None
 
 
+class DiscordAuthConfig(BaseModel):
+    """Discord API authentication configuration."""
+    bot_token_env: str = "DISCORD_BOT_TOKEN"
+
+
 class AgentConfig(BaseModel):
     """Agent configuration for Agno-based optimizations."""
     reddit_auth: Optional[RedditAuthConfig] = None
+    discord_auth: Optional[DiscordAuthConfig] = None
     models: Dict[str, ModelConfig] = Field(default_factory=dict)
 
 

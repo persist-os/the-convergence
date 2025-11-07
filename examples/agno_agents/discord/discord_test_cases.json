@@ -168,7 +168,7 @@
       "description": "Send a message to apologizing for the testing spam",
       "input": {
         "query": "Send a message to apologizing for the testing spam",
-        "channel_id": "1371294820097851402"
+        "channel_id": "1433567352150163578"
       },
       "expected": {
         "tools_called": ["send_message"],
@@ -176,7 +176,7 @@
           {
             "tool": "send_message",
             "params": {
-              "channel_id": "1371294820097851402"
+              "channel_id": "1433567352150163578"
             }
           }
         ],

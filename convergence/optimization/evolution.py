@@ -73,7 +73,21 @@ class EvolutionEngine:
             return random.choice(param_spec.values)
         
         elif param_spec.type == "discrete":
-            return random.choice(param_spec.values)
+            # Discrete can use values list or min/max/step range
+            if param_spec.values:
+                return random.choice(param_spec.values)
+            else:
+                # Generate discrete values from min/max/step
+                min_val = param_spec.min
+                max_val = param_spec.max
+                step = param_spec.step if param_spec.step else 1
+                
+                # Generate value within range
+                n_steps = int((max_val - min_val) / step)
+                random_step = random.randint(0, n_steps)
+                value = min_val + (random_step * step)
+                
+                return int(value)  # Return as integer for discrete
         
         elif param_spec.type == "continuous":
             # Sample in range [min, max] with step granularity
@@ -246,9 +260,27 @@ class EvolutionEngine:
             return random.choice(values) if values else current_value
         
         elif param_spec.type == "discrete":
-            # Pick a different discrete value
-            values = [v for v in param_spec.values if v != current_value]
-            return random.choice(values) if values else current_value
+            # Discrete can use values list or min/max/step range
+            if param_spec.values:
+                # Pick a different value from the list
+                values = [v for v in param_spec.values if v != current_value]
+                return random.choice(values) if values else current_value
+            else:
+                # Generate a different discrete value from range
+                min_val = param_spec.min
+                max_val = param_spec.max
+                step = param_spec.step if param_spec.step else 1
+                
+                # Try to find a different value
+                for _ in range(10):  # Try 10 times to find different value
+                    n_steps = int((max_val - min_val) / step)
+                    random_step = random.randint(0, n_steps)
+                    value = int(min_val + (random_step * step))
+                    if value != current_value:
+                        return value
+                
+                # If couldn't find different value, return current
+                return current_value
         
         elif param_spec.type == "continuous":
             # Gaussian mutation around current value

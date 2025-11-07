@@ -14,6 +14,7 @@ Available Adapters:
 - GeminiAdapter: Google Gemini's nested request/response structure
 - BrowserBaseAdapter: Browser automation session API
 - UniversalAgentAdapter: Universal adapter for all Agno agent implementations (Discord, Gmail, Reddit, etc.)
+- LocalFunctionAdapter: Adapter for optimizing local Python functions without HTTP endpoints
 
 To add a new adapter:
 1. Create adapter file in this directory

@@ -35,20 +35,28 @@ class Evaluator:
     - Threshold validation
     """
     
-    def __init__(self, eval_config: EvaluationConfig, config_file_path: Optional[Path] = None):
+    def __init__(
+        self, 
+        eval_config: EvaluationConfig, 
+        config_file_path: Optional[Path] = None,
+        custom_evaluator_callable: Optional[Callable] = None
+    ):
         """
         Initialize evaluator.
         
         Args:
             eval_config: Evaluation configuration from optimization schema
             config_file_path: Path to the config file (for loading local evaluators)
+            custom_evaluator_callable: Optional callable evaluator function (SDK programmatic mode)
         """
         self.config = eval_config
         self.config_file_path = config_file_path
         self.custom_evaluator = None
         
-        # Load custom evaluator if specified
-        if eval_config.custom_evaluator.enabled:
+        # Use provided callable if given (programmatic mode), otherwise load from config
+        if custom_evaluator_callable is not None:
+            self.custom_evaluator = custom_evaluator_callable
+        elif eval_config.custom_evaluator.enabled:
             self._load_custom_evaluator()
     
     def _load_custom_evaluator(self) -> None:
@@ -272,13 +280,65 @@ class Evaluator:
             raise ValueError("Custom evaluator not loaded")
         
         try:
-            # Call custom function with standard signature
-            score = self.custom_evaluator(
-                result=result,
-                expected=expected,
-                params=config_params,
-                metric=metric_name
-            )
+            import inspect
+            
+            # Detect SDK-style evaluator (returns dict, takes prediction/context)
+            try:
+                sig = inspect.signature(self.custom_evaluator)
+                # Check if it's SDK-style: takes 'prediction' and 'context' as params
+                has_prediction = 'prediction' in sig.parameters
+                has_context = 'context' in sig.parameters
+                
+                if has_prediction and has_context:
+                    # SDK-style evaluator: convert call
+                    prediction = {"result": result}
+                    context = {"params": config_params}
+                    all_scores = self.custom_evaluator(
+                        prediction=prediction,
+                        expected=expected,
+                        context=context
+                    )
+                    
+                    # Extract score for specific metric or aggregate
+                    if metric_name and metric_name in all_scores:
+                        score = all_scores[metric_name]
+                    elif 'score' in all_scores:
+                        score = all_scores['score']
+                    else:
+                        # Default to average of all scores
+                        score = sum(all_scores.values()) / len(all_scores)
+                else:
+                    # Core-style evaluator: direct call
+                    score = self.custom_evaluator(
+                        result=result,
+                        expected=expected,
+                        params=config_params,
+                        metric=metric_name
+                    )
+            except Exception:
+                # Fallback: try core-style first
+                try:
+                    score = self.custom_evaluator(
+                        result=result,
+                        expected=expected,
+                        params=config_params,
+                        metric=metric_name
+                    )
+                except Exception:
+                    # Try SDK-style as last resort
+                    prediction = {"result": result}
+                    context = {"params": config_params}
+                    all_scores = self.custom_evaluator(
+                        prediction=prediction,
+                        expected=expected,
+                        context=context
+                    )
+                    if metric_name and metric_name in all_scores:
+                        score = all_scores[metric_name]
+                    elif 'score' in all_scores:
+                        score = all_scores['score']
+                    else:
+                        score = sum(all_scores.values()) / len(all_scores)
             
             # Ensure score is between 0 and 1
             return max(0.0, min(1.0, float(score)))

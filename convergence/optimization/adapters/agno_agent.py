@@ -70,10 +70,18 @@ class UniversalAgentAdapter:
     
     def _load_runner(self):
         """Auto-discover and load the agent runner from the config directory."""
-        if not self.config_file_path:
-            raise RuntimeError("config_file_path required for UniversalAgentAdapter")
+        # Try to discover runner even without config_file_path (programmatic mode)
+        if self.config_file_path:
+            config_dir = self.config_file_path.parent
+        else:
+            # Programmatic mode: try to find runner in examples directory
+            # __file__ is at convergence/optimization/adapters/agno_agent.py
+            # We need to go up 4 levels to reach the repo root
+            config_dir = Path(__file__).parent.parent.parent.parent / "examples" / "agno_agents"
+            logger.info(f"Programmatic mode: searching for agent runner in {config_dir}")
         
-        config_dir = self.config_file_path.parent
+        if not config_dir.exists():
+            raise RuntimeError(f"Could not find agent runner directory: {config_dir}")
         runner_path = None
         runner_class_name = None
         
@@ -92,30 +100,35 @@ class UniversalAgentAdapter:
         # Try to find the specific agent runner for this service
         if service_type:
             expected_pattern = f"{service_type}_agent_runner.py"
-            candidate = config_dir / expected_pattern
-            if candidate.exists():
-                runner_path = candidate
-                runner_class_name = self.AGENT_CLASS_NAMES.get(expected_pattern)
-                logger.info(f"Found {service_type} agent runner: {expected_pattern}")
-        
-        # Fallback: search all patterns
-        if not runner_path:
-            for pattern in self.AGENT_RUNNER_PATTERNS:
-                candidate = config_dir / pattern
-                if candidate.exists():
+            # Search in config_dir and subdirectories
+            for candidate in config_dir.rglob(expected_pattern):
+                if candidate.is_file():
                     runner_path = candidate
-                    runner_class_name = self.AGENT_CLASS_NAMES.get(pattern)
-                    logger.info(f"Found agent runner: {pattern}")
+                    runner_class_name = self.AGENT_CLASS_NAMES.get(expected_pattern)
+                    logger.info(f"Found {service_type} agent runner: {candidate}")
                     break
         
-        if not runner_path or not runner_path.exists():
-            # Try to find any _agent_runner.py file as fallback
-            for file in config_dir.glob("*_agent_runner.py"):
-                runner_path = file
-                # Try to extract class name from filename
-                runner_class_name = file.stem.replace("_", " ").title().replace(" ", "")
-                logger.info(f"Found agent runner: {file.name}")
-                break
+        # Fallback: search all patterns in subdirectories
+        if not runner_path:
+            for pattern in self.AGENT_RUNNER_PATTERNS:
+                for candidate in config_dir.rglob(pattern):
+                    if candidate.is_file():
+                        runner_path = candidate
+                        runner_class_name = self.AGENT_CLASS_NAMES.get(pattern)
+                        logger.info(f"Found agent runner: {candidate}")
+                        break
+                if runner_path:
+                    break
+        
+        # Last fallback: find any _agent_runner.py file in subdirectories
+        if not runner_path:
+            for file in config_dir.rglob("*_agent_runner.py"):
+                if file.is_file():
+                    runner_path = file
+                    # Try to extract class name from filename
+                    runner_class_name = file.stem.replace("_", " ").title().replace(" ", "")
+                    logger.info(f"Found agent runner: {file}")
+                    break
         
         if not runner_path or not runner_path.exists():
             available_files = list(config_dir.glob("*.py"))
@@ -131,6 +144,12 @@ class UniversalAgentAdapter:
             # Add config directory to Python path
             sys.path.insert(0, str(config_dir))
             logger.debug(f"Added {config_dir} to Python path")
+            
+            # Add runner's parent directory to path for base class imports
+            runner_parent = str(runner_path.parent)
+            if runner_parent not in sys.path:
+                sys.path.insert(0, runner_parent)
+                logger.debug(f"Added {runner_parent} to Python path")
             
             # Import the runner module
             spec = importlib.util.spec_from_file_location(
