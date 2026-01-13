@@ -1,0 +1,69 @@
+---
+description: Create worktree for isolated development work
+allowed-tools: Bash, AskUserQuestion
+---
+
+# Branch Command (Worktree-Based)
+
+Create an isolated worktree before starting work. Never work directly on main.
+
+## Steps
+
+### 1. Check Current State
+
+```bash
+git status --short
+git branch --show-current
+git worktree list
+```
+
+### 2. If Uncommitted Changes Exist
+- Ask: commit them first, stash them, or abort?
+
+### 3. If Already in a Worktree (not main)
+- Ask: continue here, or create new worktree?
+
+### 4. If on Main, Get Branch Intention
+
+Ask user for:
+- **Type**: feat | fix | docs | refactor | test | chore
+- **Description**: 2-4 words, kebab-case
+
+### 5. Create Worktree and Open Terminal
+
+```bash
+PROJECT=$(basename $(pwd))
+git worktree add -b <type>/<description> ../${PROJECT}-<type>-<description>
+open -a Terminal ../${PROJECT}-<type>-<description>
+```
+
+### 6. Confirm
+
+Report:
+```
+Worktree created and terminal opened!
+
+Setup:
+  Main directory: [current path] (stays on main)
+  Worktree: ../${PROJECT}-<type>-<description> (on <type>/<description>)
+
+You can now:
+  1. Start Claude Code in the new terminal
+  2. Work on your feature in isolation
+  3. When done, use /ship to push and create PR
+
+Cleanup (after merge):
+  git worktree remove ../${PROJECT}-<type>-<description>
+  git branch -d <type>/<description>
+```
+
+## Branch Types
+
+| Type | Use For |
+|------|---------|
+| feat/ | New feature |
+| fix/ | Bug fix |
+| docs/ | Documentation |
+| refactor/ | Code restructure |
+| test/ | Test changes |
+| chore/ | Maintenance |

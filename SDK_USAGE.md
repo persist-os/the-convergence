@@ -1,183 +1,131 @@
-# Convergence SDK Usage Guide
+# Convergence SDK: Building Self-Learning Systems
 
-Simple programmatic interface for running Convergence optimizations from Python code.
+Programmatic interface for building systems that evolve through experience.
 
 ## Installation
 
-### For Development (Editable Install)
-
 ```bash
-# In the-convergence directory
+# Core framework
+pip install the-convergence
+
+# With self-improving agents (RLP + SAO)
+pip install "the-convergence[agents]"
+
+# Development mode
 pip install -e .
 ```
 
-### For Production
+## Three Optimization Patterns
 
-```bash
-pip install the-convergence
-```
+### Pattern 1: Batch Optimization
 
-## Quick Start
-
-### Basic Usage
+Run optimization episodes to find optimal configurations.
 
 ```python
 from convergence import run_optimization
 
-# Define optimization config
 config = {
     "api": {
         "name": "my_api",
         "endpoint": "https://api.example.com/v1/chat",
-        "request": {
-            "method": "POST",
-            "headers": {"Content-Type": "application/json"},
-            "timeout_seconds": 30
-        },
-        "auth": {
-            "type": "bearer",
-            "token_env": "API_KEY"
-        }
+        "auth": {"type": "bearer", "token_env": "API_KEY"}
     },
     "search_space": {
         "parameters": {
             "temperature": {"type": "float", "min": 0.1, "max": 1.5},
-            "max_tokens": {"type": "int", "min": 100, "max": 2000}
+            "model": {"type": "categorical", "choices": ["gpt-4o-mini", "gpt-4o"]}
         }
     },
     "evaluation": {
-        "test_cases": {
-            "inline": [
-                {
-                    "id": "test_1",
-                    "input": {"prompt": "Write a short story"},
-                    "expected": {"min_length": 100}
-                }
-            ]
-        },
-        "metrics": {
-            "quality": {"weight": 0.7, "type": "llm_judge"},
-            "cost": {"weight": 0.3, "type": "cost_normalized"}
-        }
+        "test_cases": {"inline": [{"id": "test_1", "input": {"prompt": "Hello"}}]},
+        "metrics": {"quality": {"weight": 0.7}, "cost": {"weight": 0.3}}
     },
     "optimization": {
-        "evolution": {
-            "generations": 5,
-            "population_size": 10
-        }
+        "evolution": {"generations": 5, "population_size": 10}
     }
 }
 
-# Run optimization
 result = await run_optimization(config_dict=config)
-
-# Access results
-if result["success"]:
-    print(f"Best config: {result['best_config']}")
-    print(f"Best score: {result['best_score']}")
-else:
-    print(f"Error: {result['error']}")
+print(f"Best: {result['best_config']} (score: {result['best_score']})")
 ```
 
-### Using YAML Config
+### Pattern 2: Multi-Episode Learning
 
-```python
-from convergence import run_optimization
-
-# Load from YAML file
-result = await run_optimization(yaml_path="./optimization.yaml")
-```
-
-### Mock Mode (For Testing)
+Enable warm-start to learn across optimization runs.
 
 ```python
 config = {
-    "api": {
-        "name": "test_api",
-        "endpoint": "http://localhost:8000/test",
-        "mock_mode": True  # Uses mock responses for testing
-    },
-    # ... rest of config
+    # ... base config ...
+    "legacy": {
+        "enabled": True,
+        "storage_path": "./learning_history"
+    }
 }
 
-result = await run_optimization(config_dict=config)
+# Episode 1: Explore
+result1 = await run_optimization(config_dict=config)
+
+# Episode 2: Start from Episode 1's winners
+result2 = await run_optimization(config_dict=config)
+# result2 benefits from result1's learnings
 ```
 
-## Backend Integration Example
+### Pattern 3: Runtime Selection (Production)
 
-### Context Enrichment MAB Optimization
+Per-request Thompson Sampling that evolves during production use.
 
 ```python
-from convergence import run_optimization
+from convergence import configure_runtime, runtime_select, runtime_update
 
-async def optimize_context_enrichment():
-    """Optimize MAB parameters for context enrichment."""
-    
-    config = {
-        "api": {
-            "name": "context_enrichment",
-            "endpoint": "http://backend:8000/api/enrich",
-            "mock_mode": False
-        },
-        "search_space": {
-            "parameters": {
-                "threshold": {"type": "float", "min": 0.1, "max": 0.5},
-                "limit": {"type": "int", "min": 5, "max": 20},
-                "content_types": {
-                    "type": "categorical",
-                    "choices": [
-                        ["crystal"],
-                        ["crystal", "note"],
-                        ["crystal", "note", "conversation"]
-                    ]
-                }
-            }
-        },
-        "evaluation": {
-            "test_cases": {
-                "path": "./test_cases/enrichment_tests.json"
-            },
-            "metrics": {
-                "relevance": {"weight": 0.6, "type": "cosine_similarity"},
-                "diversity": {"weight": 0.3, "type": "diversity_score"},
-                "latency": {"weight": 0.1, "type": "latency_penalty"}
-            }
-        },
-        "optimization": {
-            "evolution": {
-                "generations": 10,
-                "population_size": 20
-            }
-        }
-    }
-    
-    result = await run_optimization(config_dict=config)
-    
-    if result["success"]:
-        # Save best config to Convex
-        await save_to_convex(
-            system_name="context_enrichment",
-            params=result["best_config"],
-            score=result["best_score"]
-        )
-    
-    return result
+# Configure at startup
+await configure_runtime(
+    "my_endpoint",
+    config=RuntimeConfigSDK(
+        system="my_system",
+        default_arms=[
+            {"arm_id": "config_a", "params": {"temperature": 0.7}},
+            {"arm_id": "config_b", "params": {"temperature": 0.5}},
+        ]
+    ),
+    storage=my_storage
+)
+
+# Per-request handling
+async def handle_request(user_id: str, request):
+    # Thompson Sampling selects configuration
+    selection = await runtime_select("my_endpoint", user_id=user_id)
+
+    # Use selected parameters
+    response = await call_api(**selection.params)
+
+    # Feed reward back - system learns!
+    reward = calculate_quality(response)
+    await runtime_update(
+        "my_endpoint",
+        user_id=user_id,
+        decision_id=selection.decision_id,
+        reward=reward
+    )
+
+    return response
 ```
 
+This is the **self-evolving pattern** - your system improves with every request.
+
+---
+
 ## Response Format
+
+### Success Response
 
 ```python
 {
     "success": True,
-    "best_config": {
-        "temperature": 0.7,
-        "max_tokens": 1024
-    },
-    "best_score": 0.87,  # 0.0-1.0
+    "best_config": {"temperature": 0.7, "model": "gpt-4o-mini"},
+    "best_score": 0.87,
     "configs_generated": 50,
-    "configs_saved": 50,
-    "optimization_run_id": "my_api_1729375200_a1b2c3d4",
     "generations_run": 5,
+    "learning_session_id": "my_api_1729375200_a1b2c3d4",
     "timestamp": "2025-10-19T12:00:00"
 }
 ```
@@ -188,12 +136,13 @@ async def optimize_context_enrichment():
 {
     "success": False,
     "error": "Config validation failed: missing 'api' field",
-    "configs_generated": 0,
-    "configs_saved": 0
+    "configs_generated": 0
 }
 ```
 
-## Configuration Options
+---
+
+## Configuration Reference
 
 ### Minimal Config
 
@@ -202,7 +151,7 @@ config = {
     "api": {
         "name": "my_api",
         "endpoint": "https://api.example.com",
-        "mock_mode": True
+        "mock_mode": True  # For testing
     },
     "search_space": {
         "parameters": {
@@ -216,23 +165,134 @@ config = {
 }
 ```
 
-### Full Config (All Options)
+### Learning Configuration
 
-See `examples/` directory for complete configuration examples:
-- `examples/ai/groq_optimization.yaml` - LLM optimization
-- `examples/web_browsing/browserbase_optimization.yaml` - Web browsing
-- `examples/heycontext/context_enrichment.yaml` - Context enrichment
+```python
+config = {
+    # ... base config ...
+
+    # Cross-run learning (warm-start)
+    "legacy": {
+        "enabled": True,
+        "storage_path": "./learning_history"
+    },
+
+    # Self-improving agents
+    "society": {
+        "enabled": True,
+        "learning": {
+            "rlp_enabled": True,  # Think before acting
+            "sao_enabled": True   # Self-generate training data
+        }
+    }
+}
+```
+
+### Full Config Examples
+
+See `examples/` directory:
+- `examples/ai/openai/` - LLM optimization
+- `examples/web_browsing/browserbase/` - Web automation
+- `examples/agno_agents/` - Agent optimization
+
+---
+
+## Runtime Storage Protocol
+
+For production runtime selection, implement the storage protocol:
+
+```python
+from convergence.storage.runtime_protocol import RuntimeStorageProtocol
+
+class MyRuntimeStorage(RuntimeStorageProtocol):
+    async def get_arms(self, *, user_id: str, agent_type: str):
+        """Get current arms (configurations) for user."""
+        ...
+
+    async def initialize_arms(self, *, user_id: str, agent_type: str, arms):
+        """Initialize arms for new user."""
+        ...
+
+    async def create_decision(self, *, user_id: str, agent_type: str,
+                              arm_pulled: str, strategy_params, arms_snapshot,
+                              metadata=None):
+        """Record a selection decision."""
+        ...
+
+    async def update_performance(self, *, user_id: str, agent_type: str,
+                                 decision_id: str, reward: float,
+                                 engagement=None, metadata=None):
+        """Update arm with reward signal."""
+        ...
+
+    async def get_decision(self, *, user_id: str, decision_id: str):
+        """Retrieve decision for analysis."""
+        ...
+```
+
+See `convergence/storage/runtime_protocol.py` for complete interface.
+
+---
+
+## Self-Improving Agents
+
+### RLP (Reinforcement Learning on Policy)
+
+Agents think before selecting configurations:
+
+```python
+config = {
+    "society": {
+        "enabled": True,
+        "learning": {
+            "rlp_enabled": True
+        },
+        "llm": {
+            "model": "gpt-4o-mini",
+            "api_key_env": "OPENAI_API_KEY"
+        }
+    }
+}
+```
+
+RLP generates internal reasoning before each generation:
+- "Based on previous results, temperatures around 0.7 work best..."
+- Reasoning is rewarded when it improves prediction accuracy
+- Dense learning signal at every decision
+
+### SAO (Self-Alignment Optimization)
+
+Agents generate their own training data:
+
+```python
+config = {
+    "society": {
+        "enabled": True,
+        "learning": {
+            "sao_enabled": True
+        }
+    }
+}
+```
+
+SAO creates preference pairs from optimization history:
+- Generates prompts via persona role-play
+- Creates response comparisons
+- Self-judges to create preference labels
+- No external labeling required
+
+---
 
 ## Error Handling
 
 ```python
 try:
     result = await run_optimization(config_dict=config)
-    
+
     if not result["success"]:
         logger.error(f"Optimization failed: {result['error']}")
         return None
-    
+
     return result["best_config"]
 
 except Exception as e:
@@ -240,131 +300,48 @@ except Exception as e:
     return None
 ```
 
+---
+
 ## Testing
 
 ```bash
 # Test SDK import
-python -c "from convergence import run_optimization; print('✅ SDK import works')"
+python -c "from convergence import run_optimization; print('Ready!')"
 
-# Run example optimization
-cd examples/ai
-python run_groq_optimization.py
+# Run with mock mode
+python -c "
+import asyncio
+from convergence import run_optimization
+
+config = {
+    'api': {'name': 'test', 'endpoint': 'http://test', 'mock_mode': True},
+    'search_space': {'parameters': {'x': {'type': 'float', 'min': 0, 'max': 1}}},
+    'evaluation': {'test_cases': {'inline': [{'id': 't1', 'input': {}}]}, 'metrics': {'a': {'weight': 1}}}
+}
+
+result = asyncio.run(run_optimization(config_dict=config))
+print(f'Success: {result[\"success\"]}')
+"
 ```
+
+---
 
 ## Notes
 
 - **Mock Mode**: Use `mock_mode: True` for testing without real API calls
-- **Generations**: Start with 3-5 for quick testing, use 10-20 for production
-- **Population Size**: 10-20 works for most use cases
-- **Metrics**: Define custom evaluators for domain-specific scoring
-- **Parallel Workers**: Set to 1 for sequential evaluation (simpler debugging)
+- **Generations**: 3-5 for testing, 10-20 for production
+- **Population**: 10-20 works for most use cases
+- **Parallel Workers**: Set to 1 for sequential evaluation (easier debugging)
+- **Learning**: Enable `legacy.enabled` for cross-run improvement
 
-## Runtime Loop (Per-Request Bandit)
-
-```python
-from convergence import (
-    configure_runtime,
-    runtime_select,
-    runtime_update,
-    RuntimeConfigSDK,
-)
-from my_app.runtime_storage import MyRuntimeStorage
-
-config = RuntimeConfigSDK(
-    system="context_enrichment",
-    agent_type="chat",
-    default_arms=[
-        {
-            "arm_id": "balanced",
-            "name": "Balanced",
-            "params": {"threshold": 0.35, "limit": 5},
-        }
-    ],
-)
-
-storage = MyRuntimeStorage()
-await configure_runtime("context_enrichment", config=config, storage=storage)
-
-selection = await runtime_select(
-    "context_enrichment",
-    user_id="user_123",
-    context={"conversation_id": "conv_456"},
-)
-
-# Use selection.params in your application logic
-await runtime_update(
-    "context_enrichment",
-    user_id="user_123",
-    decision_id=selection.decision_id or "",
-    reward=0.8,
-)
-```
-
-Implement `RuntimeStorageProtocol` in your backend to persist arms and decisions:
-
-```python
-from convergence.storage.runtime_protocol import RuntimeStorageProtocol
-
-class MyRuntimeStorage(RuntimeStorageProtocol):
-    async def get_arms(self, *, user_id: str, agent_type: str):
-        ...
-
-    async def initialize_arms(self, *, user_id: str, agent_type: str, arms):
-        ...
-
-    async def create_decision(self, *, user_id: str, agent_type: str, arm_pulled: str,
-                              strategy_params, arms_snapshot, metadata=None):
-        ...
-
-    async def update_performance(self, *, user_id: str, agent_type: str, decision_id: str,
-                                 reward: float, engagement=None, grading=None, metadata=None):
-        ...
-
-    async def get_decision(self, *, user_id: str, decision_id: str):
-        ...
-```
-
-See `convergence/storage/runtime_protocol.py` for complete method signatures.
-
-## Advanced Usage
-
-### Custom Evaluator
-
-```python
-config = {
-    # ...
-    "evaluation": {
-        "custom_evaluator": {
-            "module": "./my_evaluator.py",
-            "class": "MyCustomEvaluator"
-        }
-    }
-}
-```
-
-### Agent Society (Advanced)
-
-```python
-config = {
-    # ...
-    "society": {
-        "enabled": True,
-        "learning": {
-            "rlp_enabled": True,  # Reasoning
-            "sao_enabled": True   # Self-improvement
-        },
-        "llm": {
-            "provider": "litellm",
-            "model": "gpt-4",
-            "api_key_env": "OPENAI_API_KEY"
-        }
-    }
-}
-```
+---
 
 ## Support
 
-- **Documentation**: See `README.md` and `examples/`
+- **Documentation**: `README.md`, `GETTING_STARTED.md`
+- **Examples**: `examples/` directory
 - **Issues**: https://github.com/persist-os/the-convergence/issues
-- **Examples**: Check `examples/` directory for working examples
 
+---
+
+**Stop tuning. Start evolving.**

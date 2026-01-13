@@ -1,32 +1,33 @@
 # The Convergence
 
-**API Optimization Framework powered by evolutionary algorithms, multi-armed bandits, and agent societies**
+**Self-evolving agent framework powered by reinforcement learning**
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-Apache%202.0-green.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.1.7-orange.svg)](pyproject.toml)
+[![Version](https://img.shields.io/badge/version-0.1.8-orange.svg)](pyproject.toml)
 
-The Convergence automatically finds optimal API configurations through intelligent experimentation. Instead of manually tuning parameters (model, temperature, tokens, etc.), it runs automated experiments, evaluates results, and evolves better configurations over multiple generations.
+Systems that improve themselves outperform systems you tune manually. The Convergence is a framework for building agents that learn optimal behavior through experience - using Thompson Sampling, evolutionary algorithms, and self-improving policy networks.
 
-## 🚀 Quick Start
+## The Problem
 
-### Installation
+You're tuning parameters by hand. Temperature, model selection, context limits, sampling strategies - all configured once and left static. But optimal parameters depend on your data, your users, your use case. They change over time. Manual tuning can't keep up.
+
+## The Solution
+
+Let your system learn. The Convergence treats every decision as a learning opportunity:
+
+- **Thompson Sampling** explores the configuration space intelligently
+- **Evolutionary algorithms** breed better configurations from successful ones
+- **Dense reward signals** update beliefs after every interaction
+- **Self-improving policies** (RLP + SAO) generate their own training data
+
+The result: systems that converge toward optimal behavior automatically.
+
+## Quick Start
 
 ```bash
 pip install the-convergence
 ```
-
-### 2-Minute Example
-
-```bash
-# Interactive setup wizard
-convergence init
-
-# Run optimization
-convergence optimize optimization.yaml
-```
-
-**Or use the SDK:**
 
 ```python
 from convergence import run_optimization
@@ -43,138 +44,146 @@ config = ConvergenceConfig(
 )
 
 result = await run_optimization(config)
-print(f"Best config: {result['best_config']}")
-print(f"Best score: {result['best_score']}")
+# Watch your system evolve toward optimal
 ```
 
-## 🎯 What It Does
+Or use the CLI:
 
-The Convergence optimizes API parameters to maximize performance metrics:
+```bash
+convergence init      # Interactive setup
+convergence optimize config.yaml
+```
 
-- **Quality** - Response quality (LLM judge, similarity, exact match)
-- **Latency** - Response time (milliseconds)
-- **Cost** - Price per API call (USD)
+## How It Works
 
-**Example:** Find the best `temperature` and `model` combination that maximizes quality while minimizing cost.
+The Convergence combines three reinforcement learning strategies that work together:
 
-## 🧬 How It Works
+### 1. Thompson Sampling (Bayesian Exploration)
 
-The Convergence combines three optimization strategies:
+Every configuration maintains a probability distribution over its expected reward. Selection samples from these distributions, naturally balancing exploration of uncertain options with exploitation of known good ones.
 
-1. **Multi-Armed Bandits (MAB)** - Intelligent exploration vs exploitation
-   - Thompson Sampling balances trying new configs vs exploiting known good ones
-   - Bayesian probability guides selection
+```
+Config A: Beta(15, 5) → sample 0.73
+Config B: Beta(8, 12) → sample 0.42
+Config C: Beta(2, 2)  → sample 0.61  ← High uncertainty, worth exploring
 
-2. **Evolutionary Algorithms** - Genetic mutation and crossover
-   - Mutation: Random parameter changes
-   - Crossover: Combine two successful configs
-   - Selection: Keep top performers (elitism)
+Select: A (highest sample)
+```
 
-3. **Reinforcement Learning (RL)** - Meta-learning from history
-   - Learns which parameter ranges work best
-   - Adjusts evolution parameters dynamically
-   - Hierarchical learning across runs
+### 2. Evolutionary Algorithms (Genetic Optimization)
 
-**Optional:** Agent Society (RLP + SAO) for advanced reasoning and self-improvement.
+Successful configurations breed. The population evolves through:
 
-## 📖 Documentation
+- **Selection**: Top performers survive (elitism)
+- **Mutation**: Random parameter changes explore nearby space
+- **Crossover**: Combine traits from two successful parents
 
-- **[Getting Started](GETTING_STARTED.md)** - Complete setup guide
-- **[SDK Usage](SDK_USAGE.md)** - Programmatic API reference
-- **[Quick Start](QUICKSTART.md)** - Minimal examples
-- **[YAML Configuration](YAML_CONFIGURATION_REFERENCE.md)** - Full config reference
-- **[Examples](examples/)** - Working examples for OpenAI, Groq, Azure, BrowserBase, Agno agents
+Each generation is better than the last.
 
-## 🏗️ Architecture
+### 3. Self-Improving Agents (RLP + SAO)
 
-### Core Components
+Based on cutting-edge research from NVIDIA and Hugging Face (Oct 2024):
 
-- **Optimization Engine** - Coordinates MAB, Evolution, RL
-- **API Caller** - Makes HTTP requests with config parameters
-- **Evaluator** - Scores responses against test cases
-- **Storage** - Persists results (SQLite, File, Convex, Memory)
-- **Adapters** - Provider-specific request/response transformations
+**RLP (Reinforcement Learning on Policy)**: Agents think before acting. Internal reasoning is rewarded when it improves prediction accuracy - creating dense learning signals without external verifiers.
 
-### Entry Points
+**SAO (Self-Alignment Optimization)**: Agents generate their own training data. Through persona-based prompting and self-judgment, the system creates preference pairs for continuous improvement - no human labeling required.
 
-1. **CLI** - `convergence optimize config.yaml`
-2. **SDK** - `from convergence import run_optimization`
-3. **Runtime** - Per-request bandit selection for production
+## Architecture
 
-## 🔧 Features
+```
+┌────────────────────────────────────────────────────────┐
+│                  OPTIMIZATION LOOP                      │
+│                                                        │
+│   ┌──────────┐   ┌───────────┐   ┌──────────────┐    │
+│   │ Thompson │──▶│ Evolution │──▶│ RL Meta-     │    │
+│   │ Sampling │   │  Engine   │   │ Optimizer    │    │
+│   └────┬─────┘   └─────┬─────┘   └──────┬───────┘    │
+│        │               │                 │            │
+│        │    ┌──────────┴──────────┐     │            │
+│        └───▶│   Test Population   │◀────┘            │
+│             │   (parallel eval)   │                  │
+│             └──────────┬──────────┘                  │
+│                        │                             │
+│             ┌──────────▼──────────┐                  │
+│             │   Reward Signals    │                  │
+│             │ (quality, latency,  │                  │
+│             │  cost, custom...)   │                  │
+│             └──────────┬──────────┘                  │
+│                        │                             │
+│   ┌────────────────────┼────────────────────┐       │
+│   │                    │                    │       │
+│   ▼                    ▼                    ▼       │
+│ ┌─────┐          ┌──────────┐        ┌─────────┐   │
+│ │ RLP │          │ Storage  │        │   SAO   │   │
+│ │Think│          │ (SQLite, │        │  Self-  │   │
+│ │First│          │  Convex) │        │  Train  │   │
+│ └─────┘          └──────────┘        └─────────┘   │
+│                                                     │
+└────────────────────────────────────────────────────┘
+```
 
-### Optimization Modes
+## Entry Points
 
-- **Batch Optimization** - Full optimization runs (CLI/SDK)
-- **Runtime Selection** - Per-request config selection (production)
-- **Continuous Evolution** - Arms evolve during production use
+**1. Batch Optimization** - Full optimization runs
 
-### Evaluation
+```python
+from convergence import run_optimization
+result = await run_optimization(config)
+```
 
-- **Custom Evaluators** - Write Python functions for domain-specific scoring
-- **Built-in Metrics** - Quality, latency, cost, exact match, similarity
-- **Multi-Objective** - Optimize multiple metrics simultaneously
+**2. Runtime Selection** - Per-request bandit in production
 
-### Storage
+```python
+from convergence import configure_runtime, runtime_select, runtime_update
 
-- **Multi-Backend** - SQLite (default), File, Convex, Memory
-- **Legacy System** - Tracks optimization history across runs
-- **Warm-Start** - Resume from previous winners
+await configure_runtime("my_endpoint", config=config)
+selection = await runtime_select("my_endpoint", user_id="user_123")
+# Use selection.params in your application
+await runtime_update("my_endpoint", decision_id=selection.decision_id, reward=0.8)
+```
 
-### Provider Support
+**3. CLI** - Interactive setup and optimization
+
+```bash
+convergence init
+convergence optimize config.yaml
+```
+
+## What You Can Optimize
 
 - **LLM APIs** - OpenAI, Azure OpenAI, Groq, Google Gemini
-- **Web Automation** - BrowserBase
-- **Agno Agents** - Discord, Gmail, Reddit agents
-- **Local Functions** - Optimize internal Python functions
+- **Web Automation** - BrowserBase parameters
+- **Agent Systems** - Discord, Gmail, Reddit agents via Agno
+- **Custom Endpoints** - Any HTTP API
+- **Local Functions** - Pure Python functions
 
-## 📦 Installation Options
-
-### Basic Installation
+## Installation
 
 ```bash
+# Core framework
 pip install the-convergence
-```
 
-### With Agent Society (RLP + SAO)
-
-```bash
+# With self-improving agents (RLP + SAO)
 pip install "the-convergence[agents]"
-```
 
-### With All Features
-
-```bash
+# Everything
 pip install "the-convergence[all]"
 ```
 
-### Development Mode
-
-```bash
-git clone https://github.com/persist-os/the-convergence.git
-cd the-convergence
-pip install -e ".[dev]"
-```
-
-## 🎓 Example Use Cases
-
-### 1. LLM API Optimization
-
-Optimize ChatGPT parameters for your use case:
+## Configuration
 
 ```yaml
 api:
-  name: "openai_chat"
-  endpoint: "https://api.openai.com/v1/chat/completions"
+  name: "my_api"
+  endpoint: "https://api.example.com/v1/chat"
   auth:
     type: "bearer"
-    token_env: "OPENAI_API_KEY"
+    token_env: "API_KEY"
 
 search_space:
   parameters:
-    model: ["gpt-4o-mini", "gpt-4o"]
-    temperature: [0.3, 0.5, 0.7, 0.9]
-    max_tokens: [500, 1000, 2000]
+    temperature: {type: "float", min: 0.1, max: 1.5}
+    model: {type: "categorical", choices: ["gpt-4o-mini", "gpt-4o"]}
 
 evaluation:
   test_cases:
@@ -183,149 +192,60 @@ evaluation:
     quality: {weight: 0.6, type: "llm_judge"}
     latency_ms: {weight: 0.3}
     cost_usd: {weight: 0.1}
-```
-
-### 2. Context Enrichment Optimization
-
-Optimize MAB parameters for context enrichment:
-
-```python
-from convergence import run_optimization
-
-config = ConvergenceConfig(
-    api=ApiConfig(name="context_enrichment", endpoint="http://backend:8000/api/enrich"),
-    search_space=SearchSpaceConfig(parameters={
-        "threshold": {"type": "float", "min": 0.1, "max": 0.5},
-        "limit": {"type": "int", "min": 5, "max": 20}
-    }),
-    # ... evaluation config
-)
-
-result = await run_optimization(config)
-```
-
-### 3. Runtime Per-Request Selection
-
-Use optimized configs in production:
-
-```python
-from convergence import configure_runtime, runtime_select, runtime_update
-
-# Configure once
-await configure_runtime("context_enrichment", config=config, storage=storage)
-
-# Per request
-selection = await runtime_select("context_enrichment", user_id="user_123")
-# Use selection.params in your application
-
-# After request
-await runtime_update("context_enrichment", user_id="user_123", 
-                     decision_id=selection.decision_id, reward=0.8)
-```
-
-## 🔍 How It Works (Detailed)
-
-### Optimization Flow
-
-1. **Initialization** - Load config, validate, initialize storage
-2. **Generation Loop** (for each generation):
-   - **Population Generation** - Create configs (random, mutation, crossover)
-   - **MAB Selection** - Thompson Sampling selects configs to test
-   - **Parallel Execution** - Test configs against test cases
-   - **Evaluation** - Score responses (quality, latency, cost)
-   - **Evolution** - Generate next generation (elite + mutation + crossover)
-   - **RL Meta-Optimization** - Adjust evolution parameters
-   - **Early Stopping** - Stop if converged or max generations reached
-3. **Results Export** - Save best config, all results, reports
-
-### Runtime Flow
-
-1. **Selection** - Thompson Sampling selects arm (config) for request
-2. **Execution** - Application uses selected config
-3. **Update** - Record reward (quality, latency, cost)
-4. **Evolution** - Periodically evolve arms (mutation, crossover)
-
-## 🛠️ Configuration
-
-### Minimal Config
-
-```yaml
-api:
-  name: "my_api"
-  endpoint: "https://api.example.com/v1/endpoint"
-  auth:
-    type: "bearer"
-    token_env: "API_KEY"
-
-search_space:
-  parameters:
-    param1: {type: "float", min: 0, max: 1}
-
-evaluation:
-  test_cases:
-    inline:
-      - {id: "test_1", input: {}, expected: {}}
-  metrics:
-    accuracy: {weight: 1.0}
 
 optimization:
   algorithm: "mab_evolution"
   evolution:
-    population_size: 10
-    generations: 5
+    population_size: 20
+    generations: 10
+
+# Enable self-improving agents
+society:
+  enabled: true
+  learning:
+    rlp_enabled: true   # Think before acting
+    sao_enabled: true   # Self-generate training data
 ```
 
-See [YAML_CONFIGURATION_REFERENCE.md](YAML_CONFIGURATION_REFERENCE.md) for complete reference.
+## Results
 
-## 📊 Results
+After optimization, find your evolved configurations:
 
-Results are saved in `results/` directory:
+- `results/best_config.json` - Optimal configuration
+- `results/detailed_results.json` - Full evolution history
+- `results/report.md` - Analysis and recommendations
 
-- **`best_config.json`** - Best configuration found
-- **`detailed_results.json`** - All configs tested with scores
-- **`detailed_results.csv`** - CSV export
-- **`report.md`** - Markdown report with analysis
+## Documentation
 
-## 🧪 Testing
+- **[Getting Started](GETTING_STARTED.md)** - Complete setup guide
+- **[SDK Usage](SDK_USAGE.md)** - Programmatic API reference
+- **[YAML Configuration](YAML_CONFIGURATION_REFERENCE.md)** - Full config reference
+- **[Examples](examples/)** - Working examples
 
-```bash
-# Run tests
-pytest
+## Research Foundation
 
-# Test SDK import
-python -c "from convergence import run_optimization; print('✅ Ready!')"
-```
+The Convergence builds on:
 
-## 🤝 Contributing
+- **Thompson Sampling** - Bayesian approach to exploration/exploitation
+- **Evolutionary Strategies** - Genetic algorithms for optimization
+- **RLP** - [Reinforcement Learning on Policy](https://arxiv.org/abs/2510.01265) (NVIDIA, Oct 2024)
+- **SAO** - [Self-Alignment Optimization](https://arxiv.org/abs/2510.06652) (Hugging Face, Oct 2024)
+
+## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
-## 📝 License
+## License
 
 Apache 2.0 - See [LICENSE](LICENSE) file.
 
-## 🆘 Support
+## Team
 
-- **Documentation** - See `GETTING_STARTED.md`, `SDK_USAGE.md`, `examples/`
-- **Issues** - [GitHub Issues](https://github.com/persist-os/the-convergence/issues)
-- **Security** - See [SECURITY.md](SECURITY.md)
-
-## 🗺️ Roadmap
-
-- [ ] Automated test suite with pytest
-- [ ] Performance benchmarking suite
-- [ ] Plugin development tutorial
-- [ ] Video documentation
-- [ ] Integration examples for popular APIs
-
-## 🙏 Acknowledgments
-
-Built by the PersistOS team:
-- Aria Han (aria@persistos.co)
-- Shreyash Hamal (shrey@persistos.co)
-- Myat Pyae Paing (paing@persistos.co)
+Built by [PersistOS](https://persistos.co):
+- Aria Han
+- Shreyash Hamal
+- Myat Pyae Paing
 
 ---
 
-**Happy optimizing! 🚀**
-
+**Stop tuning. Start evolving.**
