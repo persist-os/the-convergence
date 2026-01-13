@@ -340,26 +340,59 @@ Internal Reasoning:"""
     ) -> float:
         """
         Compute accuracy proxy for information gain.
-        
+
+        Uses a multi-signal similarity approach:
+        1. Sequence matching for structural similarity
+        2. N-gram overlap for phrase matching
+        3. Keyword extraction for semantic relevance
+
         In full RLP: this would be log-likelihood from model.
-        Here: we use similarity metrics.
         """
-        
-        # Simple similarity metric
-        # In production, use actual model log-probs
-        
-        pred_tokens = set(prediction.lower().split())
-        outcome_tokens = set(outcome.lower().split())
-        
-        if not pred_tokens or not outcome_tokens:
+        from difflib import SequenceMatcher
+
+        if not prediction or not outcome:
             return 0.0
-        
-        # Jaccard similarity as proxy
-        intersection = pred_tokens & outcome_tokens
-        union = pred_tokens | outcome_tokens
-        
-        similarity = len(intersection) / len(union) if union else 0.0
-        
+
+        pred_lower = prediction.lower()
+        outcome_lower = outcome.lower()
+
+        # 1. Sequence matching (0.4 weight) - captures structural similarity
+        seq_ratio = SequenceMatcher(None, pred_lower, outcome_lower).ratio()
+
+        # 2. Word overlap with context weighting (0.3 weight)
+        pred_tokens = set(pred_lower.split())
+        outcome_tokens = set(outcome_lower.split())
+        context_tokens = set(context.lower().split()) if context else set()
+
+        # Boost words that appear in context (more relevant)
+        weighted_intersection = 0.0
+        for token in pred_tokens & outcome_tokens:
+            weight = 1.5 if token in context_tokens else 1.0
+            weighted_intersection += weight
+
+        union_size = len(pred_tokens | outcome_tokens)
+        word_sim = weighted_intersection / union_size if union_size > 0 else 0.0
+        # Normalize back to 0-1 range
+        word_sim = min(1.0, word_sim)
+
+        # 3. Bigram overlap (0.3 weight) - captures phrase patterns
+        def get_bigrams(text: str) -> set:
+            words = text.split()
+            return set(zip(words[:-1], words[1:])) if len(words) > 1 else set()
+
+        pred_bigrams = get_bigrams(pred_lower)
+        outcome_bigrams = get_bigrams(outcome_lower)
+
+        if pred_bigrams and outcome_bigrams:
+            bigram_intersection = len(pred_bigrams & outcome_bigrams)
+            bigram_union = len(pred_bigrams | outcome_bigrams)
+            bigram_sim = bigram_intersection / bigram_union if bigram_union > 0 else 0.0
+        else:
+            bigram_sim = seq_ratio  # Fall back to sequence ratio
+
+        # Weighted combination
+        similarity = (0.4 * seq_ratio) + (0.3 * word_sim) + (0.3 * bigram_sim)
+
         return similarity
     
     def normalize_reward(self, reward: float) -> float:

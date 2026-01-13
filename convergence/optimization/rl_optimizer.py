@@ -34,14 +34,15 @@ class RLMetaOptimizer:
     def __init__(
         self,
         search_space: SearchSpaceConfig,
-        min_episodes_for_training: int = 50
+        min_episodes_for_training: int = 15
     ):
         """
         Initialize RL meta-optimizer.
-        
+
         Args:
             search_space: Search space configuration
-            min_episodes_for_training: Minimum optimization runs needed
+            min_episodes_for_training: Minimum episodes before policy training
+                (default: 15, suitable for typical 10-20 generation runs)
         """
         self.search_space = search_space
         self.min_episodes = min_episodes_for_training

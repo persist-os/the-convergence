@@ -131,7 +131,7 @@ class OptimizationRunner:
         if config.society and config.society.enabled:
             self.rl_optimizer = RLMetaOptimizer(
                 search_space=config.search_space,
-                min_episodes_for_training=50
+                min_episodes_for_training=15  # Lower threshold for faster learning
             )
         
         # Agent society components (RLP + SAO)
@@ -642,10 +642,12 @@ class OptimizationRunner:
                     failed_configs = [h for h in self.history[-20:] if h.get('score', 0) < 0.5]
                     
                     if len(successful_configs) >= 2 and len(failed_configs) >= 2:
-                        print("   📊 Generating synthetic preference pairs...")
-                        
-                        # Generate 3 preference pairs
-                        synthetic_data = await self.sao_agent.generate_synthetic_dataset(n_samples=3)
+                        print("   📊 Running iterative SAO refinement...")
+
+                        # Use iterative refinement for better quality data
+                        synthetic_data = await self.sao_agent.iterative_sao_refinement(
+                            n_samples_per_round=2
+                        )
                         
                         if synthetic_data:
                             print(f"   ✅ Generated {len(synthetic_data)} preference pairs")
