@@ -1,7 +1,7 @@
 [project]
 name = "the-convergence"
 version = "0.1.8"
-description = "API Optimization Framework powered by evolutionary algorithms, multi-armed bandits, and agent societies"
+description = "Self-evolving agent framework powered by reinforcement learning, evolutionary algorithms, and self-improving policies"
 authors = [
     {name = "Aria Han", email = "aria@persistos.co"},
     {name = "Shreyash Hamal", email = "shrey@persistos.co"},
@@ -16,16 +16,18 @@ readme = "README.md"
 requires-python = ">=3.11"
 license = {text = "Apache-2.0"}
 keywords = [
-    "optimization",
-    "api",
-    "evolutionary-algorithms",
-    "multi-armed-bandits",
     "reinforcement-learning",
-    "agent-society",
-    "llm-optimization",
-    "parameter-tuning",
-    "a-b-testing",
-    "machine-learning"
+    "self-evolving",
+    "agents",
+    "evolutionary-algorithms",
+    "thompson-sampling",
+    "multi-armed-bandits",
+    "rlhf",
+    "self-improvement",
+    "llm-agents",
+    "agentic-ai",
+    "machine-learning",
+    "bayesian-optimization"
 ]
 classifiers = [
     "Development Status :: 3 - Alpha",
